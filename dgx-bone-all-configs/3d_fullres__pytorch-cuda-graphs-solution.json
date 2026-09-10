@@ -1,0 +1,29 @@
+{
+  "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+  "configuration": "3d_fullres",
+  "mode": "pytorch-cuda-graphs-solution",
+  "input_source": "synthetic",
+  "patient_files": null,
+  "input_shape": [
+    1,
+    48,
+    192,
+    192
+  ],
+  "output_shape": [
+    2,
+    48,
+    192,
+    192
+  ],
+  "warmup_iterations": 5,
+  "iterations": 20,
+  "mean_ms": 320.93714752197263,
+  "median_ms": 320.9035949707031,
+  "min_ms": 318.0273742675781,
+  "max_ms": 323.43701171875,
+  "p90_ms": 322.7770965576172,
+  "p95_ms": 323.1612716674805,
+  "p99_ms": 323.3818637084961,
+  "std_ms": 1.4339954730163675
+}

@@ -1,0 +1,29 @@
+{
+  "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+  "configuration": "3d_fullres",
+  "mode": "trt-solution-fp16",
+  "input_source": "synthetic",
+  "patient_files": null,
+  "input_shape": [
+    1,
+    48,
+    192,
+    192
+  ],
+  "output_shape": [
+    2,
+    48,
+    192,
+    192
+  ],
+  "warmup_iterations": 5,
+  "iterations": 20,
+  "mean_ms": 146.76676483154296,
+  "median_ms": 146.77268981933594,
+  "min_ms": 145.42991638183594,
+  "max_ms": 147.63877868652344,
+  "p90_ms": 147.4806900024414,
+  "p95_ms": 147.61546936035157,
+  "p99_ms": 147.63411682128907,
+  "std_ms": 0.5810855126038275
+}

@@ -1,0 +1,29 @@
+{
+  "dataset": "Dataset027_ACDC",
+  "configuration": "3d_fullres",
+  "mode": "trt-solution-fp16",
+  "input_source": "synthetic",
+  "patient_files": null,
+  "input_shape": [
+    1,
+    256,
+    256,
+    10
+  ],
+  "output_shape": [
+    4,
+    256,
+    256,
+    10
+  ],
+  "warmup_iterations": 5,
+  "iterations": 20,
+  "mean_ms": 83.77584304809571,
+  "median_ms": 83.82963180541992,
+  "min_ms": 82.0759048461914,
+  "max_ms": 85.27891540527344,
+  "p90_ms": 84.91388473510742,
+  "p95_ms": 84.93374748229981,
+  "p99_ms": 85.20988182067872,
+  "std_ms": 0.9103775489182123
+}

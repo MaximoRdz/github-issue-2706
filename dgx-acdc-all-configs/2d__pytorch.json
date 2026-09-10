@@ -1,0 +1,29 @@
+{
+  "dataset": "Dataset027_ACDC",
+  "configuration": "2d",
+  "mode": "pytorch",
+  "input_source": "synthetic",
+  "patient_files": null,
+  "input_shape": [
+    1,
+    1,
+    256,
+    10
+  ],
+  "output_shape": [
+    4,
+    1,
+    256,
+    10
+  ],
+  "warmup_iterations": 5,
+  "iterations": 20,
+  "mean_ms": 26.196864128112793,
+  "median_ms": 26.287296295166016,
+  "min_ms": 25.036640167236328,
+  "max_ms": 27.782495498657227,
+  "p90_ms": 26.590384483337402,
+  "p95_ms": 27.05888442993164,
+  "p99_ms": 27.637773284912107,
+  "std_ms": 0.6190710324820017
+}

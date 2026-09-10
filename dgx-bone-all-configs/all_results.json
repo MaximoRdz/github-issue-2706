@@ -1,0 +1,408 @@
+[
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "2d",
+    "mode": "github-issue",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "output_shape": [
+      2,
+      1,
+      512,
+      512
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 227.22546157836913,
+    "median_ms": 227.49678802490234,
+    "min_ms": 223.78274536132812,
+    "max_ms": 229.4385223388672,
+    "p90_ms": 228.9338119506836,
+    "p95_ms": 229.14303894042968,
+    "p99_ms": 229.37942565917967,
+    "std_ms": 1.6179844694677934
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "2d",
+    "mode": "pytorch",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "output_shape": [
+      2,
+      1,
+      512,
+      512
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 50.336722946166994,
+    "median_ms": 50.43886375427246,
+    "min_ms": 48.968929290771484,
+    "max_ms": 51.306846618652344,
+    "p90_ms": 51.19674949645996,
+    "p95_ms": 51.22233581542969,
+    "p99_ms": 51.28994445800781,
+    "std_ms": 0.6856330091823954
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "2d",
+    "mode": "pytorch-cuda-graphs-solution",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "output_shape": [
+      2,
+      1,
+      512,
+      512
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 51.13490238189697,
+    "median_ms": 51.23135948181152,
+    "min_ms": 49.72108840942383,
+    "max_ms": 52.4571533203125,
+    "p90_ms": 51.80487976074219,
+    "p95_ms": 52.38619976043701,
+    "p99_ms": 52.4429626083374,
+    "std_ms": 0.6931057895025318
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "2d",
+    "mode": "trt-solution-autocast",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "output_shape": [
+      2,
+      1,
+      512,
+      512
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 19.746897506713868,
+    "median_ms": 19.653696060180664,
+    "min_ms": 19.28384017944336,
+    "max_ms": 20.23414421081543,
+    "p90_ms": 20.21556739807129,
+    "p95_ms": 20.216633224487303,
+    "p99_ms": 20.230642013549804,
+    "std_ms": 0.41604044901911685
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "2d",
+    "mode": "trt-solution-autocast-cg",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "output_shape": [
+      2,
+      1,
+      512,
+      512
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 18.816304016113282,
+    "median_ms": 18.969632148742676,
+    "min_ms": 18.19980812072754,
+    "max_ms": 19.754751205444336,
+    "p90_ms": 19.391394996643065,
+    "p95_ms": 19.507812595367433,
+    "p99_ms": 19.705363483428954,
+    "std_ms": 0.505121348477441
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "2d",
+    "mode": "trt-solution-fp16",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "output_shape": [
+      2,
+      1,
+      512,
+      512
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 20.17007522583008,
+    "median_ms": 19.805232048034668,
+    "min_ms": 19.753952026367188,
+    "max_ms": 21.6408634185791,
+    "p90_ms": 20.678002548217773,
+    "p95_ms": 20.734244060516357,
+    "p99_ms": 21.459539546966553,
+    "std_ms": 0.5188499945069411
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "2d",
+    "mode": "trt-solution-fp32",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "output_shape": [
+      2,
+      1,
+      512,
+      512
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 222.51408767700195,
+    "median_ms": 222.87505340576172,
+    "min_ms": 220.23426818847656,
+    "max_ms": 225.05491638183594,
+    "p90_ms": 224.5459426879883,
+    "p95_ms": 225.03530349731446,
+    "p99_ms": 225.05099380493164,
+    "std_ms": 1.5203442634188997
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "3d_fullres",
+    "mode": "github-issue",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      48,
+      192,
+      192
+    ],
+    "output_shape": [
+      2,
+      48,
+      192,
+      192
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 3723.468408203125,
+    "median_ms": 3724.515380859375,
+    "min_ms": 3717.340087890625,
+    "max_ms": 3729.759521484375,
+    "p90_ms": 3728.92353515625,
+    "p95_ms": 3729.002490234375,
+    "p99_ms": 3729.608115234375,
+    "std_ms": 4.359641882817932
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "3d_fullres",
+    "mode": "pytorch",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      48,
+      192,
+      192
+    ],
+    "output_shape": [
+      2,
+      48,
+      192,
+      192
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 322.0757232666016,
+    "median_ms": 322.2666320800781,
+    "min_ms": 319.8633728027344,
+    "max_ms": 324.1280212402344,
+    "p90_ms": 323.50209045410156,
+    "p95_ms": 323.8043579101562,
+    "p99_ms": 324.06328857421875,
+    "std_ms": 1.1644205806771066
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "3d_fullres",
+    "mode": "pytorch-cuda-graphs-solution",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      48,
+      192,
+      192
+    ],
+    "output_shape": [
+      2,
+      48,
+      192,
+      192
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 320.93714752197263,
+    "median_ms": 320.9035949707031,
+    "min_ms": 318.0273742675781,
+    "max_ms": 323.43701171875,
+    "p90_ms": 322.7770965576172,
+    "p95_ms": 323.1612716674805,
+    "p99_ms": 323.3818637084961,
+    "std_ms": 1.4339954730163675
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-autocast",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      48,
+      192,
+      192
+    ],
+    "output_shape": [
+      2,
+      48,
+      192,
+      192
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 148.1295066833496,
+    "median_ms": 148.1792755126953,
+    "min_ms": 146.72813415527344,
+    "max_ms": 149.31932067871094,
+    "p90_ms": 148.83340759277343,
+    "p95_ms": 149.21754531860353,
+    "p99_ms": 149.29896560668945,
+    "std_ms": 0.6513034904559819
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-autocast-cg",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      48,
+      192,
+      192
+    ],
+    "output_shape": [
+      2,
+      48,
+      192,
+      192
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 145.11577301025392,
+    "median_ms": 145.08010864257812,
+    "min_ms": 144.3132781982422,
+    "max_ms": 146.18873596191406,
+    "p90_ms": 145.59345245361328,
+    "p95_ms": 145.65341873168944,
+    "p99_ms": 146.08167251586914,
+    "std_ms": 0.43488220673039374
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-fp16",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      48,
+      192,
+      192
+    ],
+    "output_shape": [
+      2,
+      48,
+      192,
+      192
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 146.76676483154296,
+    "median_ms": 146.77268981933594,
+    "min_ms": 145.42991638183594,
+    "max_ms": 147.63877868652344,
+    "p90_ms": 147.4806900024414,
+    "p95_ms": 147.61546936035157,
+    "p99_ms": 147.63411682128907,
+    "std_ms": 0.5810855126038275
+  },
+  {
+    "dataset": "Dataset306_BONE_TUMOR_EXTENDED",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-fp32",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      48,
+      192,
+      192
+    ],
+    "output_shape": [
+      2,
+      48,
+      192,
+      192
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 3650.2172119140623,
+    "median_ms": 3650.5457763671875,
+    "min_ms": 3640.288330078125,
+    "max_ms": 3657.731689453125,
+    "p90_ms": 3655.9294921875,
+    "p95_ms": 3657.72333984375,
+    "p99_ms": 3657.73001953125,
+    "std_ms": 5.402805390896903
+  }
+]

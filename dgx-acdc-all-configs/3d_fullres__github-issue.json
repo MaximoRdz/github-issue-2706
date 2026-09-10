@@ -1,0 +1,29 @@
+{
+  "dataset": "Dataset027_ACDC",
+  "configuration": "3d_fullres",
+  "mode": "github-issue",
+  "input_source": "synthetic",
+  "patient_files": null,
+  "input_shape": [
+    1,
+    256,
+    256,
+    10
+  ],
+  "output_shape": [
+    4,
+    256,
+    256,
+    10
+  ],
+  "warmup_iterations": 5,
+  "iterations": 20,
+  "mean_ms": 1135.1350341796874,
+  "median_ms": 1134.8399047851562,
+  "min_ms": 1129.8988037109375,
+  "max_ms": 1142.808837890625,
+  "p90_ms": 1136.8438232421875,
+  "p95_ms": 1139.6246215820313,
+  "p99_ms": 1142.1719946289063,
+  "std_ms": 2.6759099195966365
+}

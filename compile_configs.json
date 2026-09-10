@@ -1,0 +1,77 @@
+{
+  "_README": "Each top-level key is a MODE NAME -- used everywhere (--mode, run_all.py --modes, the 'mode' field in result JSON). Add a new TRT variant to compare by adding a new entry here; no Python changes needed. Fields: 'engine_suffix' (optional, defaults to the mode name) names the .ep file as trt_compiled_<configuration>_<engine_suffix>.ep -- give two modes the SAME engine_suffix to compare 'plain' vs 'cuda_graphs' wrapping of the identical compiled engine without compiling it twice. 'cuda_graphs' (optional, default false) wraps the loaded engine in torch_tensorrt.runtime.enable_cudagraphs at inference time. 'compile_kwargs' are passed through to torch_tensorrt.compile(...) when the engine needs to be (re)built -- 'enabled_precisions' and 'autocast_low_precision_type' accept dtype strings (float32/float16/bfloat16), converted to torch dtypes automatically. 'use_debugger' / 'debugger_log_level' (optional) control the torch_tensorrt.dynamo.Debugger(...) context used during compilation.",
+
+  "github-issue": {
+    "engine_suffix": "issue",
+    "cuda_graphs": false,
+    "compile_kwargs": {
+      "dynamic": false,
+      "use_debugger": true,
+      "debugger_log_level": "error",
+      "options": {
+        "truncate_long_and_double": true,
+        "enabled_precisions": ["float32", "float16"],
+        "debug": false,
+        "optimization_level": 5
+      }
+    }
+  },
+
+  "trt-solution-fp32": {
+    "engine_suffix": "solution-fp32",
+    "cuda_graphs": false,
+    "compile_kwargs": {
+      "precision": "fp32",
+      "dynamic": false,
+      "use_debugger": true,
+      "debugger_log_level": "info",
+      "enable_autocast": false,
+      "require_full_compilation": true,
+      "optimization_level": 5
+    }
+  },
+
+  "trt-solution-fp16": {
+    "engine_suffix": "solution-fp16",
+    "cuda_graphs": false,
+    "compile_kwargs": {
+      "precision": "fp16",
+      "dynamic": false,
+      "use_debugger": true,
+      "debugger_log_level": "info",
+      "enable_autocast": false,
+      "require_full_compilation": true,
+      "optimization_level": 5
+    }
+  },
+
+  "trt-solution-autocast": {
+    "engine_suffix": "solution-autocast",
+    "cuda_graphs": false,
+    "compile_kwargs": {
+      "precision": "autocast",
+      "dynamic": false,
+      "use_debugger": true,
+      "debugger_log_level": "info",
+      "enable_autocast": true,
+      "autocast_low_precision_type": "float16",
+      "require_full_compilation": true,
+      "optimization_level": 5
+    }
+  },
+
+  "trt-solution-autocast-cg": {
+    "engine_suffix": "solution-autocast",
+    "cuda_graphs": true,
+    "compile_kwargs": {
+      "precision": "autocast",
+      "dynamic": false,
+      "use_debugger": true,
+      "debugger_log_level": "info",
+      "enable_autocast": true,
+      "autocast_low_precision_type": "float16",
+      "require_full_compilation": true,
+      "optimization_level": 5
+    }
+  }
+}
