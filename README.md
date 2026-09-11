@@ -18,8 +18,15 @@ cd nnUNet
 pip install -e .
 
 # if dataset not processed
+export nnUNet_raw="/home/maxrodri/Datasets/nnunet_raw"
+export nnUNet_preprocessed="/home/maxrodri/Datasets/nnunet_preprocessed"
+export nnUNet_results="/home/maxrodri/Datasets/nnunet_results"
+
 nnUNetv2_plan_and_preprocess -d 027 -pl nnUNetPlannerResEncL
 
+# to run all, example:
+python run_all.py --nnunet-preprocessed /home/maxrodri/Datasets/nnunet_preprocessed/Dataset306_BONE_TUMOR_EXTENDED --plans-filename "nnUNetPlans.json" --results-dir ./dgx-bone-all-configs --dataset-name Dataset306_BONE_TUMOR_EXTENDED
+python run_all.py --nnunet-preprocessed /home/maxrodri/Datasets/nnunet_preprocessed/Dataset027_ACDC --plans-filename "nnUNetResEncUNetLPlans.json" --results-dir ./dgx-bone-all-configs --dataset-name Dataset306_BONE_TUMOR_EXTENDED
 ```
 
 ## Nsight kernel time stats
