@@ -14,6 +14,10 @@ activate ...
 pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu132
 pip install torch-tensorrt   
 
+git submodule add git@github.com:MIC-DKFZ/nnUNet.git external/nnUNet
+cd external/nnUNet
+git checkout 0e49508
+
 cd nnUNet
 pip install -e .
 
