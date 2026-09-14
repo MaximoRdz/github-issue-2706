@@ -272,7 +272,8 @@ def _apply_precision(
 
     elif precision == "autocast":
         # Leave model/input in their normal dtype.
-        pass
+        # network = network.half()
+        input_tensor = input_tensor.half()
 
     else:
         raise ValueError(
@@ -405,7 +406,8 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
 
     precision = kwargs.pop("precision", "autocast")
 
-    network, input_tensor = _apply_precision(network, input_tensor, precision)
+    if not mode in PYTORCH_MODE_SPECS:
+        network, input_tensor = _apply_precision(network, input_tensor, precision)
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
@@ -425,6 +427,92 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
     print(f"[compile] saved {engine_path}")
     return engine_path
 
+def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
+                           configuration_manager: ConfigurationManager, configuration_name: str,
+                           dataset_json: dict, num_input_channels: int, device: torch.device,
+                           compiled_engines_dir: Path) -> Path:
+    """
+    Exports a RAW, standalone serialized TensorRT engine (.engine) for the
+    given mode -- loadable directly by `trtexec` or the plain TensorRT
+    Python/C++ runtime, with none of the torch.export/torch_tensorrt
+    wrapping the normal .ep artifacts (from compile_engine()) carry.
+
+    Uses the same compile_kwargs (from compile_configs.json) as the .ep
+    path, via the lower-level torch_tensorrt.dynamo.trace() +
+    torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine()
+    pair -- the same two steps torch_tensorrt.compile() performs
+    internally, just stopping short of re-wrapping the result as a
+    torch.export artifact.
+
+    Output: compiled_engines_dir / trt_raw_<configuration_name>_<engine_suffix>.engine
+
+    IMPORTANT, same as the .ep engines: a raw TensorRT .engine file is tied
+    to the exact TensorRT version (and typically GPU architecture) it was
+    built on -- it is NOT portable across machines/TensorRT installs. Build
+    and profile it with trtexec on the same box.
+
+    Also note: this traces the network the same way compile_engine() does,
+    so any mode that fails to trace via torch.export will fail identically
+    here -- this doesn't route around a tracing failure, only around the
+    torch.export re-wrapping step.
+
+    Note: torch_tensorrt's public API surface for this two-step path has
+    shifted across versions (`torch_tensorrt.dynamo.trace` /
+    `convert_exported_program_to_serialized_trt_engine`). If your installed
+    version's signature differs, the resulting error will point at what's
+    expected -- paste it back and I'll adjust to match your version.
+    """
+    if spec.compile_kwargs is None:
+        raise ValueError(f"Mode '{mode}' has no compile_kwargs -- can't export a raw engine for it.")
+
+    raw_engine_path = compiled_engines_dir / f"trt_raw_{configuration_name}_{spec.engine_suffix}.engine"
+    print(f"[export-raw] building standalone TensorRT engine for mode='{mode}' -> {raw_engine_path}")
+
+    network = get_dummy_network(plans_manager, configuration_manager, dataset_json, num_input_channels).to(device)
+    input_tensor = build_input_tensor(configuration_manager, num_input_channels, device)
+    if configuration_name == "3d_fullres":
+        # same fix as compile_engine() -- see the comment there. The raw
+        # nn.Module.forward() being traced needs a genuine batch axis;
+        # build_input_tensor deliberately omits one for 3D to match the
+        # sliding-window PREPARE contract instead.
+        input_tensor = input_tensor.unsqueeze(0)
+
+    kwargs = _resolve_dtype_fields(spec.compile_kwargs)
+    precision = kwargs.pop("precision", "autocast")
+
+    if not mode in PYTORCH_MODE_SPECS:
+        network, input_tensor = _apply_precision(network, input_tensor, precision)
+
+    use_debugger = kwargs.pop("use_debugger", True)
+    debugger_log_level = kwargs.pop("debugger_log_level", "error")
+    # torch_tensorrt.compile() accepts a nested options={...} dict (used by
+    # e.g. the github-issue recipe); the lower-level dynamo functions take
+    # flat kwargs only, so flatten it back out here.
+    if "options" in kwargs:
+        kwargs.update(kwargs.pop("options"))
+    # 'dynamic' isn't a recognized kwarg on convert_exported_program_to_serialized_trt_engine
+    # (dynamism is fully determined by the traced ExportedProgram's shapes instead) --
+    # drop it here, same static-shape behavior either way since we always trace
+    # against a single fixed input_tensor.
+    kwargs.pop("dynamic", None)
+
+    debugger_ctx = torch_tensorrt.dynamo.Debugger(log_level=debugger_log_level) if use_debugger \
+        else nullcontext()
+
+    with debugger_ctx:
+        exported_program = torch_tensorrt.dynamo.trace(network, [input_tensor])
+        serialized_engine = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+            exported_program, inputs=[input_tensor], **kwargs,
+        )
+        compiled_engines_dir.mkdir(parents=True, exist_ok=True)
+        with open(raw_engine_path, "wb") as f:
+            f.write(bytes(serialized_engine))
+
+    size_mb = raw_engine_path.stat().st_size / 1e6
+    del network, input_tensor, exported_program, serialized_engine
+    cleanup_gpu(device)
+    print(f"[export-raw] saved {raw_engine_path} ({size_mb:.1f} MB)")
+    return raw_engine_path
 
 def build_network(mode: str, *, mode_registry: Dict[str, ModeSpec], plans_manager: PlansManager,
                    configuration_manager: ConfigurationManager, configuration_name: str, dataset_json: dict,

@@ -66,3 +66,18 @@ chmod +x profile_experiment.sh   # already done, but just in case
 - `tiling_optimization_level` default is None,  [“none”, “fast”, “moderate”, “full”]
     - Tiling can substantially improve throughput for convolution-heavy models.
 - `require_full_compilation` set to True correctness gate as nnUNet is currently fully TRT-compatible
+
+## Profiling wiht trtExec
+```bash
+python compile_and_save.py \
+    --dataset-name Dataset027_ACDC \
+    --nnunet-preprocessed /lustre/uc3m_a0/dynamic/maxrodri/datasets/nnUNet/nnUNet_preprocessed/Dataset027_ACDC \
+    --plans-filename nnUNetResEncUNetLPlans.json \
+    --mode trt-solution-autocast --configurations 3d_fullres \
+    --export-raw-engine
+
+trtexec --loadEngine=Dataset027_ACDC/ \
+        --iterations=50 --avgRuns=50 \
+        --profilingVerbosity=detailed \
+        --dumpProfile --exportProfile=a40_fullres_profile.json
+```
