@@ -36,7 +36,7 @@ from pathlib import Path
 import torch
 
 from common import (CONFIGURATIONS, DEFAULT_COMPILE_CONFIGS_PATH, PlansManager, build_mode_registry,
-                     compile_engine, load_compile_configs)
+                     compile_engine, export_raw_trt_engine, load_compile_configs)
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,6 +59,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true",
                     help="torch_tensorrt dryrun=True -- prints the partitioning report but does NOT "
                          "produce a real, usable compiled engine.")
+    p.add_argument("--export-raw-engine", action="store_true",
+                    help="Also export a standalone .engine file (trt_raw_<config>_<suffix>.engine) "
+                         "loadable directly by trtexec, alongside the normal .ep artifact. Ignores "
+                         "--force for this part -- a raw engine is always (re)built when requested, "
+                         "since it's cheap relative to the .ep compile and there's no separate "
+                         "existence check to skip.")
     return p.parse_args()
 
 
@@ -88,7 +94,8 @@ def main() -> None:
     if not modes:
         raise SystemExit("Nothing to compile.")
 
-    compiled_this_run = set()  # (configuration_name, engine_suffix) -- avoid recompiling a shared engine twice
+    compiled_this_run = set()      # (configuration_name, engine_suffix) -- avoid recompiling a shared .ep twice
+    raw_exported_this_run = set()  # (configuration_name, engine_suffix) -- avoid re-exporting a shared raw engine twice
     for configuration_name in args.configurations:
         configuration_manager = plans_manager.get_configuration(configuration_name)
         for mode in modes:
@@ -99,22 +106,32 @@ def main() -> None:
             if key in compiled_this_run:
                 print(f"[skip] mode='{mode}' shares engine_suffix='{spec.engine_suffix}' with an "
                       f"already-compiled mode this run -- {engine_path} is up to date")
-                continue
-            if engine_path.exists() and not args.force:
+            elif engine_path.exists() and not args.force:
                 print(f"[skip] {engine_path} already exists (use --force to recompile)")
                 compiled_this_run.add(key)
-                continue
+            else:
+                compile_engine(
+                    mode, spec,
+                    plans_manager=plans_manager, configuration_manager=configuration_manager,
+                    configuration_name=configuration_name, dataset_json=dataset_json,
+                    num_input_channels=num_input_channels, device=device,
+                    compiled_engines_dir=compiled_engines_dir, dry_run=args.dry_run,
+                )
+                compiled_this_run.add(key)
 
-            compile_engine(
-                mode, spec,
-                plans_manager=plans_manager, configuration_manager=configuration_manager,
-                configuration_name=configuration_name, dataset_json=dataset_json,
-                num_input_channels=num_input_channels, device=device,
-                compiled_engines_dir=compiled_engines_dir, dry_run=args.dry_run,
-            )
-            compiled_this_run.add(key)
+            if args.export_raw_engine and not args.dry_run and key not in raw_exported_this_run:
+                export_raw_trt_engine(
+                    mode, spec,
+                    plans_manager=plans_manager, configuration_manager=configuration_manager,
+                    configuration_name=configuration_name, dataset_json=dataset_json,
+                    num_input_channels=num_input_channels, device=device,
+                    compiled_engines_dir=compiled_engines_dir,
+                )
+                raw_exported_this_run.add(key)
 
-    print(f"\nDone. Compiled/verified {len(compiled_this_run)} engine(s) in {compiled_engines_dir}")
+    print(f"\nDone. Compiled/verified {len(compiled_this_run)} .ep engine(s) in {compiled_engines_dir}")
+    if args.export_raw_engine:
+        print(f"Exported {len(raw_exported_this_run)} raw .engine file(s) for trtexec.")
 
 
 if __name__ == "__main__":
