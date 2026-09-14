@@ -272,7 +272,8 @@ def _apply_precision(
 
     elif precision == "autocast":
         # Leave model/input in their normal dtype.
-        pass
+        # network = network.half()
+        input_tensor = input_tensor.half()
 
     else:
         raise ValueError(
@@ -405,7 +406,8 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
 
     precision = kwargs.pop("precision", "autocast")
 
-    network, input_tensor = _apply_precision(network, input_tensor, precision)
+    if not mode in PYTORCH_MODE_SPECS:
+        network, input_tensor = _apply_precision(network, input_tensor, precision)
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
@@ -477,7 +479,9 @@ def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansMana
 
     kwargs = _resolve_dtype_fields(spec.compile_kwargs)
     precision = kwargs.pop("precision", "autocast")
-    network, input_tensor = _apply_precision(network, input_tensor, precision)
+
+    if not mode in PYTORCH_MODE_SPECS:
+        network, input_tensor = _apply_precision(network, input_tensor, precision)
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
