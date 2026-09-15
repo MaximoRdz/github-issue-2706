@@ -68,6 +68,8 @@ DTYPE_MAP = {
 
 DEFAULT_COMPILE_CONFIGS_PATH = Path(__file__).resolve().parent / "compile_configs.json"
 
+WARMUP_ITERATIONS = 20
+ITERATIONS = 100
 
 # --------------------------------------------------------------------------- #
 # GPU timing
@@ -272,6 +274,8 @@ def _apply_precision(
 
     elif precision == "autocast":
         # Leave model/input in their normal dtype.
+        # network = network.half()
+        # input_tensor = input_tensor.half()
         pass
 
     else:
@@ -405,7 +409,8 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
 
     precision = kwargs.pop("precision", "autocast")
 
-    network, input_tensor = _apply_precision(network, input_tensor, precision)
+    if mode not in PYTORCH_MODE_SPECS:
+        network, input_tensor = _apply_precision(network, input_tensor, precision)
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
@@ -477,7 +482,9 @@ def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansMana
 
     kwargs = _resolve_dtype_fields(spec.compile_kwargs)
     precision = kwargs.pop("precision", "autocast")
-    network, input_tensor = _apply_precision(network, input_tensor, precision)
+
+    if not mode in PYTORCH_MODE_SPECS:
+        network, input_tensor = _apply_precision(network, input_tensor, precision)
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
@@ -586,6 +593,7 @@ class ExperimentConfig:
     """Passed through to torch_tensorrt.compile(dryrun=...) if an engine
     needs to be auto-compiled -- True gives a partitioning report only,
     not a real usable engine (see the compile_and_save.py docstring)."""
+    measure_scope: str = "full-inference"
 
     def load_plans_and_dataset(self):
         with open(self.nnunet_preprocessed_dir / self.plans_filename) as f:
@@ -713,7 +721,7 @@ def describe_dtype(network, input_tensor, precision):
             network_dtype = next(network.parameters()).dtype
         except StopIteration:
             network_dtype = "no parameters"
-        backend = "PyTorch"
+        backend = "torch.nn.Module"
     else:
         network_dtype = getattr(network, "dtype", "N/A")
         backend = type(network).__name__
@@ -820,11 +828,23 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
             empty_cache(device)
         nvtx.range_pop()
 
-        timing = time_callable(
-            lambda: predictor.infer(prepared, perform_on_device),
-            warmup_iterations=cfg.warmup_iterations,
-            iterations=cfg.iterations,
-        )
+        print(f"INFO: running measure-scope: [{cfg.measure_scope}]")
+        if cfg.measure_scope == "full-inference":
+            timing = time_callable(
+                lambda: predictor.infer(prepared, perform_on_device),
+                warmup_iterations=cfg.warmup_iterations,
+                iterations=cfg.iterations,
+            )
+        elif cfg.measure_scope == "single-forward":
+            print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
+            timing = time_callable(
+                lambda: network(prepared.data[prepared.slicers[0]][None]),
+                warmup_iterations=cfg.warmup_iterations,
+                iterations=cfg.iterations,
+            )
+        else:
+            prinf(f"ERROR: not implemented cfg.measure_scope: [{cfg.measure_scope}]")
+            sys.exit(1)
         timing.print_summary()
 
         nvtx.range_push("extra_infer_for_output_shape")

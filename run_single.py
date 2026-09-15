@@ -19,7 +19,14 @@ import argparse
 import json
 from pathlib import Path
 
-from common import CONFIGURATIONS, DEFAULT_COMPILE_CONFIGS_PATH, ExperimentConfig, run_experiment
+from common import (
+    CONFIGURATIONS,
+    DEFAULT_COMPILE_CONFIGS_PATH,
+    ExperimentConfig,
+    run_experiment,
+    WARMUP_ITERATIONS,
+    ITERATIONS
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--nnunet-preprocessed", type=Path, required=True,
                     help="Path to nnUNet_preprocessed/<dataset_name>")
     p.add_argument("--plans-filename", default="nnUNetResEncUNetLPlans.json")
+    p.add_argument("--measure-scope", default="full-inference")
     p.add_argument("--configuration", choices=CONFIGURATIONS, required=True)
     p.add_argument("--mode", required=True,
                     help="'pytorch', 'pytorch-cuda-graphs-solution', or any mode name defined in "
@@ -45,8 +53,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--compiled-engines-dir", type=Path, default=None,
                     help="Directory containing/receiving trt_compiled_<config>_<engine_suffix>.ep "
                          "(defaults to ./<dataset_name>)")
-    p.add_argument("--warmup-iterations", type=int, default=5)
-    p.add_argument("--iterations", type=int, default=20)
+    p.add_argument("--warmup-iterations", type=int, default=WARMUP_ITERATIONS)
+    p.add_argument("--iterations", type=int, default=ITERATIONS)
     p.add_argument("--device", default="cuda")
     p.add_argument("--verbose", action="store_true")
     p.add_argument("--patient-files", nargs="+", type=Path, default=None,
@@ -90,6 +98,7 @@ def main() -> None:
         compile_configs_path=args.compile_configs,
         auto_compile=not args.no_auto_compile,
         dry_run_compile=args.dry_run_compile,
+        measure_scope=args.measure_scope,
     )
 
     print(f"=== configuration={cfg.configuration_name} mode={cfg.mode} ===")
