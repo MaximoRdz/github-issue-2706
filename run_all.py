@@ -54,6 +54,7 @@ def parse_args() -> argparse.Namespace:
                     help="Optional: real patient case files (see run_single.py --help). "
                          "The SAME case is used for every (configuration, mode) run in the sweep.")
     p.add_argument("--results-dir", type=Path, default=Path("./bench_results"))
+    p.add_argument("--verbose", action="store_true")
     return p.parse_args()
 
 
@@ -90,6 +91,8 @@ def main() -> None:
             ]
             if args.no_auto_compile:
                 cmd += ["--no-auto-compile"]
+            if args.verbose:
+                cmd += ["--verbose"]
             if args.dry_run_compile:
                 cmd += ["--dry-run-compile"]
             if args.patient_files:
