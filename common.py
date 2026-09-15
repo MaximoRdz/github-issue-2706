@@ -837,14 +837,24 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
             )
         elif cfg.measure_scope == "single-forward":
             print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
+            single_patch = prepared.data[prepared.slicers[0]][None]
+
+            def single_forward():
+                with torch.autocast(
+                    device_type=device.type,
+                    enabled=(device.type == "cuda"),
+                ):
+                    return predictor.network(single_patch)
+
             timing = time_callable(
-                lambda: network(prepared.data[prepared.slicers[0]][None]),
+                lambda: single_forward(),
                 warmup_iterations=cfg.warmup_iterations,
                 iterations=cfg.iterations,
             )
         else:
-            prinf(f"ERROR: not implemented cfg.measure_scope: [{cfg.measure_scope}]")
-            sys.exit(1)
+            raise ValueError(
+                f"Not implemented cfg.measure_scope: [{cfg.measure_scope}]"
+            )
         timing.print_summary()
 
         nvtx.range_push("extra_infer_for_output_shape")
