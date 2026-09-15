@@ -16,14 +16,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-from common import CONFIGURATIONS, DEFAULT_COMPILE_CONFIGS_PATH, build_mode_registry, load_compile_configs
-
+from common import (
+    CONFIGURATIONS,
+    DEFAULT_COMPILE_CONFIGS_PATH,
+    build_mode_registry,
+    load_compile_configs,
+    WARMUP_ITERATIONS,
+    ITERATIONS
+)
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--dataset-name", default="Dataset027_ACDC")
     p.add_argument("--nnunet-preprocessed", type=Path, required=True)
     p.add_argument("--plans-filename", default="nnUNetResEncUNetLPlans.json")
+    p.add_argument("--measure-scope", default="full-inference")
     p.add_argument("--compile-configs", type=Path, default=DEFAULT_COMPILE_CONFIGS_PATH,
                     help="JSON registry of named TensorRT compile recipes (default: "
                          "compile_configs.json next to this script). Also determines the "
@@ -79,6 +86,7 @@ def main() -> None:
                 "--iterations", str(args.iterations),
                 "--device", args.device,
                 "--output-json", str(out_json),
+                "--measure-scope", args.measure_scope,
             ]
             if args.no_auto_compile:
                 cmd += ["--no-auto-compile"]
