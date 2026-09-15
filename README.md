@@ -18,6 +18,8 @@ git submodule add git@github.com:MIC-DKFZ/nnUNet.git external/nnUNet
 cd external/nnUNet
 git checkout 0e49508
 
+git submodule update --init --recursive
+
 cd nnUNet
 pip install -e .
 
