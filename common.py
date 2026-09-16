@@ -27,6 +27,7 @@ Design decisions
 
 from __future__ import annotations
 
+import itertools
 import gc
 import json
 import time
@@ -838,6 +839,7 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
         elif cfg.measure_scope == "single-forward":
             print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
             single_patch = prepared.data[prepared.slicers[0]][None]
+            print(f"INFO: single forward is_contiguous: {single_patch.is_contiguous()}")
 
             def single_forward():
                 with torch.autocast(
@@ -848,6 +850,35 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
 
             timing = time_callable(
                 lambda: single_forward(),
+                warmup_iterations=cfg.warmup_iterations,
+                iterations=cfg.iterations,
+            )
+        elif cfg.measure_scope == "tta-inference":
+            print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
+            single_patch = prepared.data[prepared.slicers[0]][None]
+
+            def tta_forward():
+                with torch.autocast(
+                    device_type=device.type,
+                    enabled=(device.type == "cuda"),
+                ):
+                    mirror_axes = predictor.allowed_mirroring_axes if predictor.use_mirroring else None
+                    prediction = predictor.network(single_patch)
+
+                    if mirror_axes is not None:
+                        assert max(mirror_axes) <= single_patch.ndim - 3, 'mirror_axes does not match the dimension of the input!'
+
+                        mirror_axes = [m + 2 for m in mirror_axes]
+                        axes_combinations = [
+                            c for i in range(len(mirror_axes)) for c in itertools.combinations(mirror_axes, i + 1)
+                        ]
+                        for axes in axes_combinations:
+                            prediction += torch.flip(predictor.network(torch.flip(single_patch, axes)), axes)
+                        prediction /= (len(axes_combinations) + 1)
+                    return prediction
+
+            timing = time_callable(
+                lambda: tta_forward(),
                 warmup_iterations=cfg.warmup_iterations,
                 iterations=cfg.iterations,
             )
