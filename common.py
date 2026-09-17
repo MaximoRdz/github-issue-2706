@@ -38,9 +38,16 @@ from typing import Callable, ContextManager, Dict, List, Optional
 
 import numpy as np
 import torch
+from torch.fx import symbolic_trace
+from torch.fx.passes.shape_prop import ShapeProp
 import torch.backends.cudnn as cudnn
 import torch.cuda.nvtx as nvtx
 from torch import nn
+from torch.profiler import profile, ProfilerActivity
+from torch.autograd import DeviceType
+
+from torchinfo import summary
+
 
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
@@ -142,6 +149,193 @@ def time_callable(fn: Callable[[], object], warmup_iterations: int, iterations: 
 
     gpu_latencies_ms = np.array([s.elapsed_time(e) for s, e in zip(start_events, end_events)])
     return TimingResult(gpu_latencies_ms=gpu_latencies_ms, wall_latencies_ms=wall_times_s * 1000.0)
+
+
+def get_torchinfo_profile_layers(model, sample_input, max_depth=3):
+    info = summary(
+        model,
+        input_data=sample_input,
+        verbose=0,
+        depth=max_depth,
+        device=str(sample_input.device),
+    )
+
+    layers = []
+
+    for layer_info in info.summary_list:
+
+        depth = getattr(layer_info, "depth", None)
+
+        if depth is None or depth > max_depth:
+            continue
+
+        module = getattr(layer_info, "module", None)
+
+        if module is None:
+            continue
+
+        class_name = getattr( layer_info, "class_name", module.__class__.__name__,)
+
+        layers.append( { "layer_info": layer_info, "module": module, "class_name": class_name, "depth": depth, "depth_idx": getattr( layer_info, "depth_index", None,), })
+
+    return layers
+
+def profile_torchinfo_blocks(
+    model,
+    sample_input,
+    output_json_path,
+    warmup_iterations=5,
+    max_depth=3,
+):
+    model.eval()
+
+    profile_layers = get_torchinfo_profile_layers(model, sample_input, max_depth)
+
+    print("\n" + "=" * 100)
+    print("Torchinfo profiling blocks")
+    print("=" * 100)
+
+    for i, layer in enumerate(profile_layers):
+        print(
+            f"{i:4d} "
+            f"{layer['depth']}-{layer['depth_idx']} "
+            f"{layer['class_name']:<30} "
+            f"{layer['module'].__class__.__name__}"
+        )
+
+    print("=" * 100)
+    module_to_layer_ids = {}
+
+    for layer_id, layer in enumerate(profile_layers):
+        module = layer["module"]
+
+        module_to_layer_ids.setdefault( id(module), [],).append(layer_id)
+
+    execution_events = { layer_id: [] for layer_id in range(len(profile_layers)) }
+
+    active_calls = {}
+
+    def pre_hook(module, inputs):
+        module_id = id(module)
+
+        layer_ids = module_to_layer_ids.get( module_id, [],)
+
+        if not layer_ids:
+            return
+
+        layer_id = layer_ids[0]
+
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+
+        start.record()
+
+        active_calls.setdefault( module_id, [],).append( ( layer_id, start, end,))
+
+    def post_hook(module, inputs, output):
+        module_id = id(module)
+
+        calls = active_calls.get(module_id)
+
+        if not calls:
+            return
+
+        layer_id, start, end = calls.pop()
+
+        end.record()
+
+        execution_events[layer_id].append( ( start, end,))
+
+    handles = []
+
+    hooked_modules = set()
+
+    for layer in profile_layers:
+        module = layer["module"]
+
+        if id(module) in hooked_modules:
+            continue
+
+        hooked_modules.add(id(module))
+
+        handles.append( module.register_forward_pre_hook(pre_hook))
+
+        handles.append( module.register_forward_hook(post_hook))
+
+    with torch.inference_mode():
+        for _ in range(warmup_iterations):
+            with torch.autocast( device_type=sample_input.device.type, enabled=sample_input.device.type == "cuda",):
+                model(sample_input)
+
+    torch.cuda.synchronize()
+
+    execution_events = { layer_id: [] for layer_id in range(len(profile_layers)) }
+
+    active_calls.clear()
+
+    total_start = torch.cuda.Event(enable_timing=True)
+    total_end = torch.cuda.Event(enable_timing=True)
+
+    total_start.record()
+
+    with torch.inference_mode():
+        with torch.autocast( device_type=sample_input.device.type, enabled=sample_input.device.type == "cuda",):
+            model(sample_input)
+
+    total_end.record()
+
+    torch.cuda.synchronize()
+
+    total_time_ms = total_start.elapsed_time(total_end)
+
+    profile_records = [ { "count": 1, } ]
+
+    for layer_id, layer in enumerate(profile_layers):
+
+        events = execution_events[layer_id]
+
+        if not events:
+            time_ms = 0.0
+        else:
+            time_ms = sum( start.elapsed_time(end) for start, end in events)
+
+        percentage = ( 100.0 * time_ms / total_time_ms if total_time_ms > 0 else 0.0)
+
+        depth = layer["depth"]
+        depth_idx = layer["depth_idx"]
+
+        profile_records.append(
+            {
+                "name": layer["class_name"],
+                "depth": depth,
+                "depthIdx": depth_idx,
+                "timeMs": time_ms,
+                "averageMs": time_ms,
+                "medianMs": time_ms,
+                "percentage": percentage,
+            }
+        )
+
+    for handle in handles:
+        handle.remove()
+
+    with open(output_json_path, "w") as f:
+        json.dump( profile_records, f, indent=2,)
+
+    print("\n" + "=" * 100)
+    print("PyTorch torchinfo architecture profile")
+    print("=" * 100)
+    print(f"Total forward : {total_time_ms:.3f} ms")
+    print(f"Profile blocks: {len(profile_layers)}")
+    print(f"Saved         : {output_json_path}")
+    print("-" * 100)
+
+    for record in profile_records[1:]:
+        print( f"{record['name']:<30} " f"{record['timeMs']:>10.3f} ms " f"{record['percentage']:>8.2f}%")
+
+    print("=" * 100)
+
+    return profile_records
 
 
 def cleanup_gpu(device: torch.device) -> None:
@@ -287,6 +481,64 @@ def _apply_precision(
 
     return network, input_tensor
 
+
+def save_fx_model_with_shapes(
+    model: torch.nn.Module,
+    example_input: torch.Tensor,
+    output_path: str | Path,
+) -> None:
+    model.eval()
+
+    # FX symbolic trace
+    gm = symbolic_trace(model)
+
+    # Shape propagation
+    with torch.no_grad():
+        ShapeProp(gm).propagate(example_input)
+
+    nodes = []
+
+    for idx, node in enumerate(gm.graph.nodes):
+        entry = {
+            "index": idx,
+            "name": node.name,
+            "op": node.op,
+            "target": str(node.target),
+            "args": str(node.args),
+            "kwargs": str(node.kwargs),
+        }
+
+        # Tensor metadata generated by ShapeProp
+        tensor_meta = node.meta.get("tensor_meta")
+
+        if tensor_meta is not None:
+            entry["shape"] = list(tensor_meta.shape)
+            entry["dtype"] = str(tensor_meta.dtype)
+            entry["requires_grad"] = getattr(
+                tensor_meta, "requires_grad", None
+            )
+
+            # Some PyTorch versions expose these
+            if hasattr(tensor_meta, "stride"):
+                entry["stride"] = list(tensor_meta.stride)
+
+            if hasattr(tensor_meta, "memory_format"):
+                entry["memory_format"] = str(tensor_meta.memory_format)
+
+        nodes.append(entry)
+
+    result = {
+        "graph": nodes,
+    }
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open("w") as f:
+        json.dump(result, f, indent=2)
+
+    print(f"[FX] saved characterized graph to {output_path}")
+
 # --------------------------------------------------------------------------- #
 # Mode registry -- modes come from TWO sources:
 #   1. A couple of fixed, always-available baseline modes (plain pytorch,
@@ -418,6 +670,9 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
     debugger_ctx = torch_tensorrt.dynamo.Debugger(log_level=debugger_log_level) if use_debugger \
         else nullcontext()
 
+    print(f"INFO: kwargs getting into compile engine:")
+    for k, v in kwargs.items():
+        print(f"\t{k}: {v}")
     with debugger_ctx:
         trt_gm = torch_tensorrt.compile(
             network, ir="dynamo", inputs=[input_tensor], backend="torch_tensorrt",
@@ -474,18 +729,20 @@ def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansMana
 
     network = get_dummy_network(plans_manager, configuration_manager, dataset_json, num_input_channels).to(device)
     input_tensor = build_input_tensor(configuration_manager, num_input_channels, device)
-    if configuration_name == "3d_fullres":
-        # same fix as compile_engine() -- see the comment there. The raw
-        # nn.Module.forward() being traced needs a genuine batch axis;
-        # build_input_tensor deliberately omits one for 3D to match the
-        # sliding-window PREPARE contract instead.
-        input_tensor = input_tensor.unsqueeze(0)
+    if configuration_name == "3d_fullres": input_tensor = input_tensor.unsqueeze(0)
 
     kwargs = _resolve_dtype_fields(spec.compile_kwargs)
     precision = kwargs.pop("precision", "autocast")
 
     if not mode in PYTORCH_MODE_SPECS:
         network, input_tensor = _apply_precision(network, input_tensor, precision)
+
+    print("INFO: constructing fx graph of raw pytorch layers!")
+    save_fx_model_with_shapes(
+        network,
+        input_tensor,
+        f"pytorch_fx_graph_{configuration_name}.json",
+    )
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
@@ -502,6 +759,10 @@ def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansMana
 
     debugger_ctx = torch_tensorrt.dynamo.Debugger(log_level=debugger_log_level) if use_debugger \
         else nullcontext()
+
+    print(f"INFO: kwargs getting into engine creation:")
+    for k, v in kwargs.items():
+        print(f"\t{k}: {v}")
 
     with debugger_ctx:
         exported_program = torch_tensorrt.dynamo.trace(network, [input_tensor])
@@ -830,6 +1091,8 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
         nvtx.range_pop()
 
         print(f"INFO: running measure-scope: [{cfg.measure_scope}]")
+        timing = None
+
         if cfg.measure_scope == "full-inference":
             timing = time_callable(
                 lambda: predictor.infer(prepared, perform_on_device),
@@ -853,6 +1116,63 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
                 warmup_iterations=cfg.warmup_iterations,
                 iterations=cfg.iterations,
             )
+        elif cfg.measure_scope == "single-forward-profile-pytorch":
+            print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
+            single_patch = prepared.data[prepared.slicers[0]][None]
+            print(f"INFO: single forward is_contiguous: {single_patch.is_contiguous()}")
+
+            def single_forward():
+                with torch.autocast(
+                    device_type=device.type,
+                    enabled=(device.type == "cuda"),
+                ):
+                    return predictor.network(single_patch)
+
+            with torch.profiler.profile(
+                activities=[
+                    torch.profiler.ProfilerActivity.CPU,
+                    torch.profiler.ProfilerActivity.CUDA,
+                ],
+                record_shapes=True,
+                profile_memory=True,
+                with_stack=True,
+            ) as prof:
+                timing = time_callable(
+                    lambda: single_forward(),
+                    warmup_iterations=cfg.warmup_iterations,
+                    iterations=cfg.iterations,
+                )
+
+            events = prof.events()
+
+            pytorch_ops = [
+                e for e in events
+                if e.device_type == DeviceType.CPU and e.cuda_time_total > 0
+            ]
+            pytorch_ops.sort(key=lambda e: e.time_range.start)
+
+            pytorch_json = [ { "count": cfg.iterations, "name": e.name, "timeMs": e.cuda_time_total / 1000.0, "averageMs": e.cuda_time_total / e.count / 1000.0, } for e in pytorch_ops if "nn.Module" in e.name]
+
+            with open(f"{cfg.configuration_name}_pytorch_ops_profile.json", "w") as f:
+                json.dump(pytorch_json, f, indent=2)
+
+            cuda_kernels = [
+                e for e in events
+                if e.device_type == DeviceType.CUDA
+            ]
+
+            cuda_kernels.sort(key=lambda e: e.time_range.start)
+
+            cuda_json = [ { "count": cfg.iterations, "name": e.name, "timeMs": e.cuda_time_total / 1000.0, "averageMs": e.cuda_time_total / e.count / 1000.0, } for e in cuda_kernels ]
+
+            with open(f"{cfg.configuration_name}_pytorch_cuda_profile.json", "w") as f:
+                json.dump(cuda_json, f, indent=2)
+
+        elif cfg.measure_scope == "single-forward-profile-blocks":
+            single_patch = prepared.data[prepared.slicers[0]][None]
+            profile_model = predictor.network
+            _ = profile_torchinfo_blocks(profile_model, single_patch, "test.json", warmup_iterations=5)
+
         elif cfg.measure_scope == "tta-inference":
             print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
             single_patch = prepared.data[prepared.slicers[0]][None]
@@ -886,7 +1206,8 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
             raise ValueError(
                 f"Not implemented cfg.measure_scope: [{cfg.measure_scope}]"
             )
-        timing.print_summary()
+
+        if timing: timing.print_summary()
 
         nvtx.range_push("extra_infer_for_output_shape")
         predicted_logits = predictor.infer(prepared, perform_on_device)  # untimed, just to report output shape
