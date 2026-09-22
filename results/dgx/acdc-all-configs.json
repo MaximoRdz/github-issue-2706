@@ -1,0 +1,640 @@
+[
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "github-issue",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 5.205236792564392,
+    "median_ms": 5.0957441329956055,
+    "min_ms": 5.075071811676025,
+    "max_ms": 6.041888236999512,
+    "p90_ms": 5.367420625686647,
+    "p95_ms": 5.940382409095764,
+    "p99_ms": 6.021587071418762,
+    "std_ms": 0.26945226725161603
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "pytorch",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 6.056958389282227,
+    "median_ms": 5.999631881713867,
+    "min_ms": 5.981088161468506,
+    "max_ms": 6.64086389541626,
+    "p90_ms": 6.201708698272705,
+    "p95_ms": 6.3343101978302006,
+    "p99_ms": 6.579553155899047,
+    "std_ms": 0.15563949422570084
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "pytorch-compile",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 4.366964817047119,
+    "median_ms": 4.291056156158447,
+    "min_ms": 4.272799968719482,
+    "max_ms": 5.07696008682251,
+    "p90_ms": 4.629776191711426,
+    "p95_ms": 4.742559862136841,
+    "p99_ms": 5.0100800418853755,
+    "std_ms": 0.20012844558874826
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "pytorch-compile-nhwc-split-conv",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 4.001110422611236,
+    "median_ms": 3.8715840578079224,
+    "min_ms": 3.8401920795440674,
+    "max_ms": 4.54640007019043,
+    "p90_ms": 4.521433591842651,
+    "p95_ms": 4.545062375068665,
+    "p99_ms": 4.5461325311660765,
+    "std_ms": 0.2618940310873543
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "pytorch-nhwc",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 5.537598395347596,
+    "median_ms": 5.485648155212402,
+    "min_ms": 5.460288047790527,
+    "max_ms": 5.9069437980651855,
+    "p90_ms": 5.621443128585816,
+    "p95_ms": 5.811670279502868,
+    "p99_ms": 5.8878890943527225,
+    "std_ms": 0.11417911999418968
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "pytorch-nhwc-split-conv",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 5.527982401847839,
+    "median_ms": 5.486799955368042,
+    "min_ms": 5.452703952789307,
+    "max_ms": 6.004447937011719,
+    "p90_ms": 5.576550436019898,
+    "p95_ms": 5.802926182746887,
+    "p99_ms": 5.964143586158752,
+    "std_ms": 0.12964789435051352
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "trt-solution-autocast",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 1.5804176032543182,
+    "median_ms": 1.5282880067825317,
+    "min_ms": 1.5167360305786133,
+    "max_ms": 2.0681920051574707,
+    "p90_ms": 1.730742394924164,
+    "p95_ms": 1.8153856337070466,
+    "p99_ms": 2.0176307308673853,
+    "std_ms": 0.13358269117619018
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "trt-solution-fp16",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 1.5834464073181151,
+    "median_ms": 1.5247359871864319,
+    "min_ms": 1.5143040418624878,
+    "max_ms": 2.042720079421997,
+    "p90_ms": 1.7327232122421268,
+    "p95_ms": 1.874516808986664,
+    "p99_ms": 2.0090794253349302,
+    "std_ms": 0.1351970459906669
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "trt-solution-fp16-nhwc",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 1.632729595899582,
+    "median_ms": 1.530400037765503,
+    "min_ms": 1.5196479558944702,
+    "max_ms": 2.2727038860321045,
+    "p90_ms": 1.9421855568885804,
+    "p95_ms": 1.9686432480812075,
+    "p99_ms": 2.2118917584419244,
+    "std_ms": 0.20456779607339518
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "trt-solution-fp16-nhwc-split-conv",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 1.578094381093979,
+    "median_ms": 1.5224319696426392,
+    "min_ms": 1.5105279684066772,
+    "max_ms": 2.0687038898468018,
+    "p90_ms": 1.7301151514053348,
+    "p95_ms": 1.931751972436905,
+    "p99_ms": 2.0413135063648222,
+    "std_ms": 0.1472942177312485
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "2d",
+    "mode": "trt-solution-fp32",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      1,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      1,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 5.172476768493652,
+    "median_ms": 5.108959913253784,
+    "min_ms": 5.083615779876709,
+    "max_ms": 6.095808029174805,
+    "p90_ms": 5.285052871704101,
+    "p95_ms": 5.345535922050477,
+    "p99_ms": 5.945753607749938,
+    "std_ms": 0.21963937617028265
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "github-issue",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 283.5518493652344,
+    "median_ms": 283.5557556152344,
+    "min_ms": 281.60400390625,
+    "max_ms": 285.71136474609375,
+    "p90_ms": 284.9268463134766,
+    "p95_ms": 285.4422348022461,
+    "p99_ms": 285.65753875732423,
+    "std_ms": 1.1245361638114182
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "pytorch",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 36.51263866424561,
+    "median_ms": 36.51323318481445,
+    "min_ms": 36.01232147216797,
+    "max_ms": 37.252159118652344,
+    "p90_ms": 36.86491355895996,
+    "p95_ms": 36.90824508666992,
+    "p99_ms": 37.18337631225586,
+    "std_ms": 0.32683989707716904
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "pytorch-compile",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 31.27576961517334,
+    "median_ms": 31.21947193145752,
+    "min_ms": 30.4039363861084,
+    "max_ms": 31.918880462646484,
+    "p90_ms": 31.878025817871094,
+    "p95_ms": 31.891914558410644,
+    "p99_ms": 31.913487281799316,
+    "std_ms": 0.45268084666074987
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "pytorch-compile-nhwc-split-conv",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 28.22421751022339,
+    "median_ms": 28.28268814086914,
+    "min_ms": 27.379423141479492,
+    "max_ms": 28.894336700439453,
+    "p90_ms": 28.84372787475586,
+    "p95_ms": 28.884425163269043,
+    "p99_ms": 28.89235439300537,
+    "std_ms": 0.5095637658852489
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "pytorch-nhwc",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 67.7668327331543,
+    "median_ms": 67.7285270690918,
+    "min_ms": 67.06861114501953,
+    "max_ms": 68.24835205078125,
+    "p90_ms": 68.22598419189453,
+    "p95_ms": 68.22959442138672,
+    "p99_ms": 68.24460052490234,
+    "std_ms": 0.3872510097353254
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "pytorch-nhwc-split-conv",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 66.90800857543945,
+    "median_ms": 66.74543762207031,
+    "min_ms": 66.16515350341797,
+    "max_ms": 68.00511932373047,
+    "p90_ms": 67.47233352661132,
+    "p95_ms": 67.49993171691895,
+    "p99_ms": 67.90408180236817,
+    "std_ms": 0.4597714449357719
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-autocast",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 20.173860931396483,
+    "median_ms": 20.10524845123291,
+    "min_ms": 19.611007690429688,
+    "max_ms": 20.814367294311523,
+    "p90_ms": 20.603226089477538,
+    "p95_ms": 20.705110263824462,
+    "p99_ms": 20.792515888214112,
+    "std_ms": 0.3697272681821699
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-fp16",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 20.069192028045656,
+    "median_ms": 20.26512050628662,
+    "min_ms": 19.598655700683594,
+    "max_ms": 20.886367797851562,
+    "p90_ms": 20.500234413146973,
+    "p95_ms": 20.674480152130126,
+    "p99_ms": 20.843990268707277,
+    "std_ms": 0.43074247155998874
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-fp16-nhwc",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 20.19075212478638,
+    "median_ms": 19.871376037597656,
+    "min_ms": 19.77452850341797,
+    "max_ms": 20.784671783447266,
+    "p90_ms": 20.749805641174316,
+    "p95_ms": 20.78066005706787,
+    "p99_ms": 20.783869438171386,
+    "std_ms": 0.4199019929991468
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-fp16-nhwc-split-conv",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 20.258073806762695,
+    "median_ms": 20.23566436767578,
+    "min_ms": 19.80054473876953,
+    "max_ms": 20.89891242980957,
+    "p90_ms": 20.735926818847656,
+    "p95_ms": 20.757947540283205,
+    "p99_ms": 20.870719451904296,
+    "std_ms": 0.37435371214863666
+  },
+  {
+    "dataset": "Dataset027",
+    "configuration": "3d_fullres",
+    "mode": "trt-solution-fp32",
+    "input_source": "synthetic",
+    "patient_files": null,
+    "input_shape": [
+      1,
+      256,
+      256,
+      10
+    ],
+    "output_shape": [
+      4,
+      256,
+      256,
+      10
+    ],
+    "warmup_iterations": 5,
+    "iterations": 20,
+    "mean_ms": 288.8147674560547,
+    "median_ms": 284.0967559814453,
+    "min_ms": 281.4241638183594,
+    "max_ms": 305.5093688964844,
+    "p90_ms": 299.47059326171876,
+    "p95_ms": 300.9718490600586,
+    "p99_ms": 304.6018649291992,
+    "std_ms": 7.77971303084992
+  }
+]
