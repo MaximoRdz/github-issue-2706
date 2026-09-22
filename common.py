@@ -4,25 +4,10 @@ Shared utilities for the nnU-Net sliding-window inference benchmark suite.
 Design decisions
 ----------------
 1. Timing isolation
-   The GPU timer wraps ONLY the core sliding-window inference call
-   (`nnUNetPredictor._internal_predict_sliding_window_return_logits`).
-   Padding and slicer computation are input-dependent, not mode-dependent,
-   so they run exactly ONCE (`BenchPredictor.prepare`) before the timed
-   loop instead of being repeated -- and measured -- on every iteration.
 
 2. Process isolation
-   torch, cuDNN, TensorRT and CUDA graphs all keep internal state
-   (autotuned-algorithm cache, captured device-memory addresses, engine
-   contexts) that `del` + `torch.cuda.empty_cache()` cannot reliably undo
-   within a single process. To guarantee every (configuration, mode)
-   experiment starts from an identical "cold" GPU/allocator state, each
-   experiment is meant to be run in its own subprocess -- see run_all.py.
-   `cleanup_gpu()` here is only a best-effort in-process cleanup for
-   quick/manual runs.
 
 3. No branching duplication
-   Each mode is one entry in MODE_REGISTRY. Adding a new mode means
-   adding one ModeSpec, not copy-pasting a block.
 """
 
 from __future__ import annotations
@@ -49,24 +34,22 @@ from torch.autograd import DeviceType
 from torchinfo import summary
 
 
+# torch._logging.set_logs(graph_code=True)
+
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 from nnunetv2.utilities.helpers import empty_cache, dummy_context
 from nnunetv2.utilities.plans_handling.plans_handler import ConfigurationManager, PlansManager
 from acvl_utils.cropping_and_padding.padding import pad_nd_image
 
-# torch_tensorrt registers the custom ops needed to deserialize/run TRT-compiled
-# torch.export programs. Import it unconditionally (as the original script did)
-# so "github-issue" / "trt-*" modes work even though "pytorch" mode doesn't need it.
 import torch_tensorrt  # noqa: F401
+
+from no_cat_network import build_no_cat_network, test_no_cat_network
 
 cudnn.benchmark = True
 
 CONFIGURATIONS = ("2d", "3d_fullres")
 
-# Torch dtype strings usable inside compile_configs.json (JSON can't hold
-# torch.dtype objects directly, so recipes spell them as strings and we
-# resolve them here before handing kwargs to torch_tensorrt.compile).
 DTYPE_MAP = {
     "float32": torch.float32, "float": torch.float32,
     "float16": torch.float16, "half": torch.float16,
@@ -137,7 +120,7 @@ def time_callable(fn: Callable[[], object], warmup_iterations: int, iterations: 
     nvtx.range_push("measured")
     for i in range(iterations):
         nvtx.range_push(f"measured_iter_{i}")
-        torch.cuda.synchronize()  # drain the previous iteration before starting the clock
+        torch.cuda.synchronize()
         wall_start = time.perf_counter()
         start_events[i].record()
         fn()
@@ -339,11 +322,6 @@ def profile_torchinfo_blocks(
 
 
 def cleanup_gpu(device: torch.device) -> None:
-    """
-    Best-effort in-process cleanup. Does NOT guarantee a fully "cold"
-    CUDA/cuDNN/TensorRT state -- use process isolation (run_all.py) for
-    that guarantee between experiments.
-    """
     if device.type == "cuda":
         torch.cuda.synchronize(device)
     gc.collect()
@@ -402,11 +380,6 @@ class BenchPredictor(nnUNetPredictor):
 
     @torch.inference_mode()
     def infer(self, prepared: PreparedInput, perform_everything_on_device: bool) -> torch.Tensor:
-        """
-        THIS is what the benchmark times: a one-to-one wrapper around
-        `_internal_predict_sliding_window_return_logits`, with no padding,
-        slicer, or device-transfer overhead attached.
-        """
         with torch.autocast(self.device.type, enabled=True) if self.device.type == "cuda" else dummy_context():
             return self._internal_predict_sliding_window_return_logits(
                 prepared.data, prepared.slicers, perform_everything_on_device,
@@ -436,20 +409,19 @@ class BenchPredictor(nnUNetPredictor):
 
 def get_dummy_network(plans_manager: PlansManager, configuration_manager: ConfigurationManager,
                        dataset_json: dict, num_input_channels: int,
-                       enable_deep_supervision: bool = False) -> nn.Module:
-    """
-    Build a raw nnU-Net architecture straight from the plans/configuration,
-    with randomly initialized weights -- exactly what nnUNetTrainer.initialize()
-    calls internally, without needing a trainer/checkpoint/fingerprint.
-    """
+                      enable_deep_supervision: bool = False, split_conv_mode: bool = False) -> nn.Module:
     label_manager = plans_manager.get_label_manager(dataset_json)
-    return nnUNetTrainer.build_network_architecture(
+    network = nnUNetTrainer.build_network_architecture(
         plans_manager,
         configuration_manager,
         num_input_channels,
         label_manager.num_segmentation_heads,
         enable_deep_supervision=enable_deep_supervision,
     )
+
+    if not split_conv_mode: return network
+
+    return build_no_cat_network(network, stage_indices=[2, 3, 4])
 
 def _apply_precision(
     network: nn.Module,
@@ -469,8 +441,6 @@ def _apply_precision(
 
     elif precision == "autocast":
         # Leave model/input in their normal dtype.
-        # network = network.half()
-        # input_tensor = input_tensor.half()
         pass
 
     else:
@@ -489,10 +459,8 @@ def save_fx_model_with_shapes(
 ) -> None:
     model.eval()
 
-    # FX symbolic trace
     gm = symbolic_trace(model)
 
-    # Shape propagation
     with torch.no_grad():
         ShapeProp(gm).propagate(example_input)
 
@@ -508,7 +476,6 @@ def save_fx_model_with_shapes(
             "kwargs": str(node.kwargs),
         }
 
-        # Tensor metadata generated by ShapeProp
         tensor_meta = node.meta.get("tensor_meta")
 
         if tensor_meta is not None:
@@ -518,7 +485,6 @@ def save_fx_model_with_shapes(
                 tensor_meta, "requires_grad", None
             )
 
-            # Some PyTorch versions expose these
             if hasattr(tensor_meta, "stride"):
                 entry["stride"] = list(tensor_meta.stride)
 
@@ -540,13 +506,7 @@ def save_fx_model_with_shapes(
     print(f"[FX] saved characterized graph to {output_path}")
 
 # --------------------------------------------------------------------------- #
-# Mode registry -- modes come from TWO sources:
-#   1. A couple of fixed, always-available baseline modes (plain pytorch,
-#      and pytorch wrapped in cuda-graphs) that don't need any compiled
-#      artifact.
-#   2. Named TensorRT compile recipes loaded from compile_configs.json --
-#      add a new TRT variant to compare by adding a JSON entry, not by
-#      editing this file. See compile_configs.json for the schema.
+# Mode registry
 # --------------------------------------------------------------------------- #
 
 @dataclass
@@ -557,22 +517,26 @@ class ModeSpec:
     uses_cuda_graphs: bool = False       # wrap the network with torch_tensorrt.runtime.enable_cudagraphs
     precision: str = "autocast"
     compile_kwargs: Optional[dict] = None  # raw torch_tensorrt.compile() kwargs, used only if the engine is missing
+    split_conv_mode: bool = False        # optional: conv(cat(A, B)) = conv1(A) + conv2(B)
+    use_channels_last: bool = False      # defaul: NCHW
+    torch_compile: bool = False
+    force_recompile: bool = False
 
 
 PYTORCH_MODE_SPECS: Dict[str, ModeSpec] = {
     "pytorch": ModeSpec("pytorch", needs_compiled_engine=False),
-    "pytorch-cuda-graphs-solution": ModeSpec("pytorch-cuda-graphs-solution",
-                                              needs_compiled_engine=False, uses_cuda_graphs=True),
+    "pytorch-compile": ModeSpec("pytorch", needs_compiled_engine=False, torch_compile=True),
+    "pytorch-nhwc": ModeSpec("pytorch-nhwc", needs_compiled_engine=False, use_channels_last=True),
+    "pytorch-nhwc-split-conv": ModeSpec("pytorch-nhwc-split-conv", needs_compiled_engine=False, use_channels_last=True,
+                                        split_conv_mode=True),
+    "pytorch-compile-nhwc-split-conv": ModeSpec("pytorch-nhwc-split-conv", needs_compiled_engine=False, use_channels_last=True,
+                                        split_conv_mode=True, torch_compile=True),
+    # "pytorch-cuda-graphs-solution": ModeSpec("pytorch-cuda-graphs-solution",
+    #                                           needs_compiled_engine=False, uses_cuda_graphs=True),
 }
 
 
 def load_compile_configs(path: Path) -> dict:
-    """
-    Loads the named TensorRT compile recipes. See compile_configs.json next
-    to this file for the schema and worked examples (github-issue /
-    trt-solution / trt-cuda-graphs-solution reproduce the original
-    hand-written compile_as_issue / compile_as_solution functions).
-    """
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
@@ -585,12 +549,6 @@ def load_compile_configs(path: Path) -> dict:
 
 
 def build_mode_registry(compile_configs: dict) -> Dict[str, ModeSpec]:
-    """
-    Merges the fixed pytorch baseline modes with one ModeSpec per entry in
-    compile_configs.json. The JSON key IS the mode name used everywhere
-    (--mode, run_all.py --modes, result JSON "mode" field) -- e.g.
-    "github-issue", "trt-solution", "best_config", "test_whatever_config".
-    """
     registry = dict(PYTORCH_MODE_SPECS)
     for mode_name, entry in compile_configs.items():
         if mode_name.startswith("_"):
@@ -608,6 +566,9 @@ def build_mode_registry(compile_configs: dict) -> Dict[str, ModeSpec]:
                 entry.get("compile_kwargs", {}).get("precision", "autocast")
             ),
             compile_kwargs=entry.get("compile_kwargs"),
+            split_conv_mode=entry.get("split_conv_mode", False),
+            use_channels_last=entry.get("use_channels_last", False),
+            force_recompile=entry.get("force_recompile", False)
         )
     return registry
 
@@ -628,22 +589,7 @@ def _resolve_dtype_fields(d: dict) -> dict:
 def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
                     configuration_manager: ConfigurationManager, configuration_name: str,
                     dataset_json: dict, num_input_channels: int, device: torch.device,
-                    compiled_engines_dir: Path, dry_run: bool = False) -> Path:
-    """
-    Builds a fresh dummy network and compiles it with TensorRT per
-    `spec.compile_kwargs` (sourced from compile_configs.json), saving the
-    result to compiled_engines_dir / trt_compiled_<configuration_name>_<engine_suffix>.ep.
-
-    Shared by:
-      - build_network()'s auto-compile-if-missing path (lazy, one engine
-        at a time, whatever an experiment actually needs), and
-      - compile_and_save.py (eager/bulk pre-compilation of a whole sweep).
-
-    Note: mirrors the original compile_as_issue/compile_as_solution
-    functions' use of torch_tensorrt.dynamo.Debugger + torch_tensorrt.compile
-    + torch_tensorrt.save. If your torch_tensorrt version's API differs,
-    the resulting error will point at what's expected.
-    """
+                   compiled_engines_dir: Path, dry_run: bool = False) -> Path:
     if spec.compile_kwargs is None:
         raise ValueError(f"Mode '{mode}' has no compile_kwargs in the compile-configs registry "
                           f"-- can't auto-compile it (only modes loaded from compile_configs.json can be).")
@@ -651,19 +597,33 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
     engine_path = compiled_engines_dir / f"trt_compiled_{configuration_name}_{spec.engine_suffix}.ep"
     print(f"[compile] '{engine_path.name}' not found -- compiling now (mode='{mode}', dry_run={dry_run})")
 
-    network = get_dummy_network(plans_manager, configuration_manager, dataset_json, num_input_channels).to(device)
+    network = get_dummy_network(plans_manager,
+                                configuration_manager,
+                                dataset_json,
+                                num_input_channels,
+                                split_conv_mode=spec.split_conv_mode).to(device)
+
     input_tensor = build_input_tensor(configuration_manager, num_input_channels, device)
 
+    if configuration_name == "3d_fullres":
+        input_tensor = input_tensor.unsqueeze(0)
 
+    if spec.use_channels_last:
+        mem_format = (torch.channels_last_3d if input_tensor.ndim == 5 else torch.channels_last)
 
-    if configuration_name == "3d_fullres": input_tensor = input_tensor.unsqueeze(0)
+        network = network.to(memory_format=mem_format)
+        input_tensor = input_tensor.to(memory_format=mem_format)
 
     kwargs = _resolve_dtype_fields(spec.compile_kwargs)
-
     precision = kwargs.pop("precision", "autocast")
 
-    if mode not in PYTORCH_MODE_SPECS:
-        network, input_tensor = _apply_precision(network, input_tensor, precision)
+    network, input_tensor = _apply_precision(network, input_tensor, precision)
+
+    trt_input = torch_tensorrt.Input(
+        shape=input_tensor.shape,
+        dtype=input_tensor.dtype,
+        format=torch.contiguous_format if not spec.use_channels_last else mem_format,
+    )
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
@@ -673,12 +633,18 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
     print(f"INFO: kwargs getting into compile engine:")
     for k, v in kwargs.items():
         print(f"\t{k}: {v}")
+
     with debugger_ctx:
         trt_gm = torch_tensorrt.compile(
-            network, ir="dynamo", inputs=[input_tensor], backend="torch_tensorrt",
-            dryrun=dry_run, **kwargs,
+            network,
+            ir="dynamo",
+            inputs=[trt_input],
+            backend="torch_tensorrt",
+            dryrun=dry_run,
+            **kwargs,
         )
         compiled_engines_dir.mkdir(parents=True, exist_ok=True)
+
         torch_tensorrt.save(trt_gm, str(engine_path), inputs=[input_tensor])
 
     del network, input_tensor, trt_gm
@@ -686,58 +652,39 @@ def compile_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
     print(f"[compile] saved {engine_path}")
     return engine_path
 
+
 def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansManager,
-                           configuration_manager: ConfigurationManager, configuration_name: str,
-                           dataset_json: dict, num_input_channels: int, device: torch.device,
-                           compiled_engines_dir: Path) -> Path:
-    """
-    Exports a RAW, standalone serialized TensorRT engine (.engine) for the
-    given mode -- loadable directly by `trtexec` or the plain TensorRT
-    Python/C++ runtime, with none of the torch.export/torch_tensorrt
-    wrapping the normal .ep artifacts (from compile_engine()) carry.
-
-    Uses the same compile_kwargs (from compile_configs.json) as the .ep
-    path, via the lower-level torch_tensorrt.dynamo.trace() +
-    torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine()
-    pair -- the same two steps torch_tensorrt.compile() performs
-    internally, just stopping short of re-wrapping the result as a
-    torch.export artifact.
-
-    Output: compiled_engines_dir / trt_raw_<configuration_name>_<engine_suffix>.engine
-
-    IMPORTANT, same as the .ep engines: a raw TensorRT .engine file is tied
-    to the exact TensorRT version (and typically GPU architecture) it was
-    built on -- it is NOT portable across machines/TensorRT installs. Build
-    and profile it with trtexec on the same box.
-
-    Also note: this traces the network the same way compile_engine() does,
-    so any mode that fails to trace via torch.export will fail identically
-    here -- this doesn't route around a tracing failure, only around the
-    torch.export re-wrapping step.
-
-    Note: torch_tensorrt's public API surface for this two-step path has
-    shifted across versions (`torch_tensorrt.dynamo.trace` /
-    `convert_exported_program_to_serialized_trt_engine`). If your installed
-    version's signature differs, the resulting error will point at what's
-    expected -- paste it back and I'll adjust to match your version.
-    """
+                            configuration_manager: ConfigurationManager, configuration_name: str,
+                            dataset_json: dict, num_input_channels: int, device: torch.device,
+                            compiled_engines_dir: Path) -> Path:
     if spec.compile_kwargs is None:
         raise ValueError(f"Mode '{mode}' has no compile_kwargs -- can't export a raw engine for it.")
 
     raw_engine_path = compiled_engines_dir / f"trt_raw_{configuration_name}_{spec.engine_suffix}.engine"
     print(f"[export-raw] building standalone TensorRT engine for mode='{mode}' -> {raw_engine_path}")
 
-    network = get_dummy_network(plans_manager, configuration_manager, dataset_json, num_input_channels).to(device)
+    print("WARNING: using hardcoded split conv net approach")
+    network = get_dummy_network(plans_manager, configuration_manager, dataset_json, num_input_channels, split_conv_mode=spec.split_conv_mode).to(device)
     input_tensor = build_input_tensor(configuration_manager, num_input_channels, device)
+
     if configuration_name == "3d_fullres": input_tensor = input_tensor.unsqueeze(0)
+
+    if spec.use_channels_last:
+        mem_format = (
+            torch.channels_last_3d
+            if input_tensor.ndim == 5
+            else torch.channels_last
+        )
+        network = network.to(memory_format=mem_format)
+        input_tensor = input_tensor.to(memory_format=mem_format)
 
     kwargs = _resolve_dtype_fields(spec.compile_kwargs)
     precision = kwargs.pop("precision", "autocast")
 
-    if not mode in PYTORCH_MODE_SPECS:
-        network, input_tensor = _apply_precision(network, input_tensor, precision)
+    network, input_tensor = _apply_precision(network, input_tensor, precision)
 
     print("INFO: constructing fx graph of raw pytorch layers!")
+    # somehow add distinction of datasetname to avoid collisions when saving files
     save_fx_model_with_shapes(
         network,
         input_tensor,
@@ -746,16 +693,16 @@ def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansMana
 
     use_debugger = kwargs.pop("use_debugger", True)
     debugger_log_level = kwargs.pop("debugger_log_level", "error")
-    # torch_tensorrt.compile() accepts a nested options={...} dict (used by
-    # e.g. the github-issue recipe); the lower-level dynamo functions take
-    # flat kwargs only, so flatten it back out here.
     if "options" in kwargs:
         kwargs.update(kwargs.pop("options"))
-    # 'dynamic' isn't a recognized kwarg on convert_exported_program_to_serialized_trt_engine
-    # (dynamism is fully determined by the traced ExportedProgram's shapes instead) --
-    # drop it here, same static-shape behavior either way since we always trace
-    # against a single fixed input_tensor.
     kwargs.pop("dynamic", None)
+
+    # 2. Define explicit TensorRT Input spec preserving memory format
+    trt_input = torch_tensorrt.Input(
+        shape=input_tensor.shape,
+        dtype=input_tensor.dtype,
+        format=torch.contiguous_format if not spec.use_channels_last else mem_format,
+    )
 
     debugger_ctx = torch_tensorrt.dynamo.Debugger(log_level=debugger_log_level) if use_debugger \
         else nullcontext()
@@ -766,8 +713,9 @@ def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansMana
 
     with debugger_ctx:
         exported_program = torch_tensorrt.dynamo.trace(network, [input_tensor])
+
         serialized_engine = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
-            exported_program, inputs=[input_tensor], **kwargs,
+            exported_program, inputs=[trt_input], **kwargs,
         )
         compiled_engines_dir.mkdir(parents=True, exist_ok=True)
         with open(raw_engine_path, "wb") as f:
@@ -779,16 +727,18 @@ def export_raw_trt_engine(mode: str, spec: ModeSpec, *, plans_manager: PlansMana
     print(f"[export-raw] saved {raw_engine_path} ({size_mb:.1f} MB)")
     return raw_engine_path
 
+
+
 def build_network(mode: str, *, mode_registry: Dict[str, ModeSpec], plans_manager: PlansManager,
                    configuration_manager: ConfigurationManager, configuration_name: str, dataset_json: dict,
                    num_input_channels: int, device: torch.device, compiled_engines_dir: Path,
-                   auto_compile: bool = True, dry_run_compile: bool = False) -> nn.Module:
+                  auto_compile: bool = True, dry_run_compile: bool = False) -> nn.Module:
     if mode not in mode_registry:
         raise KeyError(f"Unknown mode '{mode}'. Available modes: {sorted(mode_registry)}")
     spec = mode_registry[mode]
     if spec.needs_compiled_engine:
         engine_path = compiled_engines_dir / f"trt_compiled_{configuration_name}_{spec.engine_suffix}.ep"
-        if not engine_path.exists():
+        if spec.force_recompile or not engine_path.exists():
             if not auto_compile:
                 raise FileNotFoundError(f"Compiled engine not found: {engine_path} "
                                          f"(auto-compile is disabled -- pass auto_compile=True / drop "
@@ -800,7 +750,20 @@ def build_network(mode: str, *, mode_registry: Dict[str, ModeSpec], plans_manage
                 compiled_engines_dir=compiled_engines_dir, dry_run=dry_run_compile,
             )
         return torch.export.load(engine_path).module()
-    network = get_dummy_network(plans_manager, configuration_manager, dataset_json, num_input_channels)
+    network = get_dummy_network(plans_manager, configuration_manager, dataset_json, num_input_channels, split_conv_mode=spec.split_conv_mode)
+
+    if "pytorch" in mode and spec.torch_compile:
+        print(f"INFO: mode {mode} using torch.compile()")
+
+        compiled = torch.compile(
+            network.to(device),
+            # backend="inductor",
+            # # mode="max-autotune",   # or "reduce-overhead" if launch overhead dominates for your patch size
+            # mode="reduce-overhead",   # or "reduce-overhead" if launch overhead dominates for your patch size
+            fullgraph=True,
+        )
+        return compiled
+
     return network.to(device)
 
 
@@ -892,27 +855,6 @@ def build_input_tensor(configuration_manager: ConfigurationManager, num_input_ch
 def load_case_from_files(image_files: List[Path], plans_manager: PlansManager,
                           configuration_manager: ConfigurationManager, dataset_json: dict,
                           verbose: bool = False):
-    """
-    Loads and preprocesses a REAL patient case using nnU-Net's OWN
-    preprocessing pipeline -- the exact code path real inference uses
-    (resampling to the configuration's target spacing, intensity
-    normalization, cropping, ...) -- rather than hand-building a tensor.
-    That sidesteps having to guess axis ordering per configuration: the
-    official preprocessor already returns the convention the predictor
-    expects for whichever `configuration_manager` (2D or 3D) you pass in.
-
-    Always a single case -- no batch dimension is added, batch stays 1
-    for real data just like it does for the synthetic path.
-
-    `image_files` must be given in dataset_json channel order, e.g.
-    [".../case_0000.nii.gz"] for a single-modality dataset, or
-    [".../case_0000.nii.gz", ".../case_0001.nii.gz"] for multi-modal.
-
-    Note: this relies on `ConfigurationManager.preprocessor_class` and
-    `<PreprocessorClass>.run_case(...)` from the standard nnU-Net v2 API.
-    If your installed nnunetv2 version's signature differs, the resulting
-    error will point at exactly what's expected -- happy to adjust if so.
-    """
     expected_channels = len(dataset_json["channel_names"])
     if len(image_files) != expected_channels:
         raise ValueError(
@@ -945,26 +887,6 @@ def load_case_from_files(image_files: List[Path], plans_manager: PlansManager,
 
 def postprocess_to_original_geometry(predictor: "BenchPredictor", predicted_logits: torch.Tensor,
                                       properties: dict, return_probabilities: bool = True):
-    """
-    Undo the RESAMPLING (not just the sliding-window padding `finalize()`
-    undoes) so the result is aligned back to the ORIGINAL patient geometry
-    -- e.g. (76, 512, 512) instead of the resampled (76, 437, 429) network
-    space. This mirrors what real nnU-Net inference does after
-    predict_sliding_window_return_logits, via
-    nnUNetPredictor.convert_predicted_logits_to_segmentation_with_correct_shape.
-
-    This is CPU-bound resampling, not GPU inference -- call it OUTSIDE the
-    timed benchmark loop. It's a correctness/visualization step, not a
-    latency measurement.
-
-    return_probabilities=True  -> float array (num_classes, *original_shape)
-    return_probabilities=False -> integer label map (*original_shape,)
-
-    Note: relies on the standard nnU-Net v2
-    `convert_predicted_logits_to_segmentation_with_correct_shape` API.
-    If your installed version's signature/return contract differs, the
-    resulting error will point at what's expected.
-    """
     logits_np = predicted_logits.detach().cpu().numpy() if isinstance(predicted_logits, torch.Tensor) \
         else predicted_logits
     result = predictor.convert_predicted_logits_to_segmentation_with_correct_shape(
@@ -1052,6 +974,13 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
 
     network, input_tensor = _apply_precision(network, input_tensor, mode_registry[cfg.mode].precision)
 
+    if mode_registry[cfg.mode].use_channels_last:
+        mem_format = (
+            torch.channels_last_3d
+            if cfg.configuration_name == "3d_fullres"
+            else torch.channels_last
+        )
+        network = network.to(memory_format=mem_format)
     describe_dtype(
         network,
         input_tensor,
@@ -1072,14 +1001,12 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
     with runtime_context(cfg.mode, mode_registry, predictor.network) as active_network:
         predictor.network = active_network
 
-        # Setup (padding + slicer computation) happens ONCE, outside the
-        # timed loop -- it doesn't depend on the mode being benchmarked.
         nvtx.range_push("prepare_input")
+        print(f"INFOOOOO: input tensor to prepare: {input_tensor.shape}")
         prepared = predictor.prepare(input_tensor)
+
         nvtx.range_pop()
 
-        # Resolve perform_everything_on_device once so every timed
-        # iteration takes an identical code path.
         perform_on_device = predictor.perform_everything_on_device and device.type != "cpu"
         nvtx.range_push("oom_probe_call")
         try:
@@ -1090,8 +1017,13 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
             empty_cache(device)
         nvtx.range_pop()
 
+        single_patch = prepared.data[prepared.slicers[0]][None]
+
+        if mode_registry[cfg.mode].use_channels_last:
+            single_patch = single_patch.to(memory_format=mem_format)
+
         print(f"INFO: running measure-scope: [{cfg.measure_scope}]")
-        timing = None
+        timing = {}
 
         if cfg.measure_scope == "full-inference":
             timing = time_callable(
@@ -1099,9 +1031,9 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
                 warmup_iterations=cfg.warmup_iterations,
                 iterations=cfg.iterations,
             )
+
         elif cfg.measure_scope == "single-forward":
             print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
-            single_patch = prepared.data[prepared.slicers[0]][None]
             print(f"INFO: single forward is_contiguous: {single_patch.is_contiguous()}")
 
             def single_forward():
@@ -1116,9 +1048,9 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
                 warmup_iterations=cfg.warmup_iterations,
                 iterations=cfg.iterations,
             )
+
         elif cfg.measure_scope == "single-forward-profile-pytorch":
             print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
-            single_patch = prepared.data[prepared.slicers[0]][None]
             print(f"INFO: single forward is_contiguous: {single_patch.is_contiguous()}")
 
             def single_forward():
@@ -1145,10 +1077,7 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
 
             events = prof.events()
 
-            pytorch_ops = [
-                e for e in events
-                if e.device_type == DeviceType.CPU and e.cuda_time_total > 0
-            ]
+            pytorch_ops = [ e for e in events if e.device_type == DeviceType.CPU and e.cuda_time_total > 0 ]
             pytorch_ops.sort(key=lambda e: e.time_range.start)
 
             pytorch_json = [ { "count": cfg.iterations, "name": e.name, "timeMs": e.cuda_time_total / 1000.0, "averageMs": e.cuda_time_total / e.count / 1000.0, } for e in pytorch_ops if "nn.Module" in e.name]
@@ -1169,14 +1098,10 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
                 json.dump(cuda_json, f, indent=2)
 
         elif cfg.measure_scope == "single-forward-profile-blocks":
-            single_patch = prepared.data[prepared.slicers[0]][None]
             profile_model = predictor.network
-            _ = profile_torchinfo_blocks(profile_model, single_patch, "test.json", warmup_iterations=5)
+            _ = profile_torchinfo_blocks(profile_model, single_patch, f"{cfg.configuration_name}_{cfg.mode}_{cfg.dataset_name}_pytorch_blocks_profile.json", warmup_iterations=5, max_depth=3)
 
         elif cfg.measure_scope == "tta-inference":
-            print("INFO: single forward input tensor info ", prepared.data[prepared.slicers[0]][None].shape, prepared.data.device)
-            single_patch = prepared.data[prepared.slicers[0]][None]
-
             def tta_forward():
                 with torch.autocast(
                     device_type=device.type,
@@ -1217,18 +1142,19 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
         output = predictor.finalize(prepared, predicted_logits)
         nvtx.range_pop()
 
-    result = {
-        "dataset": cfg.dataset_name,
-        "configuration": cfg.configuration_name,
-        "mode": cfg.mode,
-        "input_source": "real" if cfg.patient_files else "synthetic",
-        "patient_files": [str(f) for f in cfg.patient_files] if cfg.patient_files else None,
-        "input_shape": list(input_tensor.shape),
-        "output_shape": list(output.shape),
-        "warmup_iterations": cfg.warmup_iterations,
-        "iterations": cfg.iterations,
-        **timing.summary(),
-    }
+    if timing:
+        result = {
+            "dataset": cfg.dataset_name,
+            "configuration": cfg.configuration_name,
+            "mode": cfg.mode,
+            "input_source": "real" if cfg.patient_files else "synthetic",
+            "patient_files": [str(f) for f in cfg.patient_files] if cfg.patient_files else None,
+            "input_shape": list(input_tensor.shape),
+            "output_shape": list(output.shape),
+            "warmup_iterations": cfg.warmup_iterations,
+            "iterations": cfg.iterations,
+            **timing.summary(),
+        }
 
     do_postprocess = cfg.patient_files and (cfg.postprocess_to_original_shape or cfg.save_segmentation_path)
     if do_postprocess:
@@ -1256,3 +1182,4 @@ def run_experiment(cfg: ExperimentConfig) -> dict:
     del predicted_logits, output, predictor, network
     cleanup_gpu(device)
     return result
+
