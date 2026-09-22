@@ -12,7 +12,7 @@ python -m venv ...
 activate ...
 
 pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu132
-pip install torch-tensorrt   
+pip install torch-tensorrt  torchinfo 
 
 git submodule add git@github.com:MIC-DKFZ/nnUNet.git external/nnUNet
 cd external/nnUNet
