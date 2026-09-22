@@ -12,7 +12,7 @@ python -m venv ...
 activate ...
 
 pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu132
-pip install torch-tensorrt   
+pip install torch-tensorrt  torchinfo 
 
 git submodule add git@github.com:MIC-DKFZ/nnUNet.git external/nnUNet
 cd external/nnUNet
@@ -24,8 +24,15 @@ cd nnUNet
 pip install -e .
 
 # if dataset not processed
+export nnUNet_raw="/home/maxrodri/Datasets/nnunet_raw"
+export nnUNet_preprocessed="/home/maxrodri/Datasets/nnunet_preprocessed"
+export nnUNet_results="/home/maxrodri/Datasets/nnunet_results"
+
 nnUNetv2_plan_and_preprocess -d 027 -pl nnUNetPlannerResEncL
 
+# to run all, example:
+python run_all.py --nnunet-preprocessed /home/maxrodri/Datasets/nnunet_preprocessed/Dataset306_BONE_TUMOR_EXTENDED --plans-filename "nnUNetPlans.json" --results-dir ./dgx-bone-all-configs --dataset-name Dataset306_BONE_TUMOR_EXTENDED
+python run_all.py --nnunet-preprocessed /home/maxrodri/Datasets/nnunet_preprocessed/Dataset027_ACDC --plans-filename "nnUNetResEncUNetLPlans.json" --results-dir ./dgx-bone-all-configs --dataset-name Dataset306_BONE_TUMOR_EXTENDED
 ```
 
 ## Nsight kernel time stats
