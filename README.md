@@ -18,7 +18,7 @@ And, answering the original question: in such case, the generated engine is slow
 
 The plot below shows exactly this: `github-issue` (the reported setup) and `trt-solution-fp32` (forcing compilation to work only with precision fp32) sit roughly an order of magnitude above every other configuration, because both are effectively running fp32 under the hood.
 
-![fp32 tax - ACDC 3D fullres](plots/fp32_tax_Dataset027_3d_fullres.png)
+![fp32 tax - ACDC 3D fullres](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/fp32_tax_Dataset027_3d_fullres.png)
 
 ## Proposed Solution
 
