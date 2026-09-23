@@ -94,9 +94,9 @@ As this topic aligns with my thesis, I performed some experiments to check. In p
 
 TensorRT compiled engine performs really well for 2d as the task is compute-bound and not really bandwidth bound the fused kernels and other optimizations dominate over `torch.compile` (patch size of ~ 5.1 KB for fp16)
 
-![Ablation - ACDC 2D - A40](plots/ablation_Dataset027_2d_A40.png)
+![Ablation - ACDC 2D - A40](plots/ablation_Dataset027_2d_a40.png)
 
-![Ablation - ACDC 2D - L40S](plots/ablation_Dataset027_2d_L40S.png)
+![Ablation - ACDC 2D - L40S](plots/ablation_Dataset027_2d_l40s.png)
 
 ![Ablation - ACDC 2D - DGX Spark](plots/ablation_Dataset027_2d_dgx.png)
 
@@ -105,9 +105,9 @@ TensorRT compiled engine performs really well for 2d as the task is compute-boun
 
 Again we see some improvements by using tensorRT but the larger input size already appears (patch size ~ 0.5 MB) particularly bad for L40S
 
-![Ablation - BONES 2D - A40](plots/ablation_Dataset306_2d_A40.png)
+![Ablation - BONES 2D - A40](plots/ablation_Dataset306_2d_a40.png)
 
-![Ablation - BONES 2D - L40S](plots/ablation_Dataset306_2d_L40S.png)
+![Ablation - BONES 2D - L40S](plots/ablation_Dataset306_2d_l40s.png)
 
 ![Ablation - BONES 2D - DGX Spark](plots/ablation_Dataset306_2d_dgx.png)
 
@@ -118,18 +118,18 @@ Again we see some improvements by using tensorRT but the larger input size alrea
 
 `torch.compile` is better for GPUs with worst bandwidth where the bad compilation of skip connections effect dominates. 
 
-![Ablation - ACDC 3D fullres - A40](plots/ablation_Dataset027_3d_fullres_A40.png)
+![Ablation - ACDC 3D fullres - A40](plots/ablation_Dataset027_3d_fullres_a40.png)
 
-![Ablation - ACDC 3D fullres - L40S](plots/ablation_Dataset027_3d_fullres_L40S.png)
+![Ablation - ACDC 3D fullres - L40S](plots/ablation_Dataset027_3d_fullres_l40s.png)
 
 ![Ablation - ACDC 3D fullres - DGX Spark](plots/ablation_Dataset027_3d_fullres_dgx.png)
 
 
 **BONES (Dataset306)**
 
-![Ablation - BONES 3D fullres - A40](plots/ablation_Dataset306_3d_fullres_A40.png)
+![Ablation - BONES 3D fullres - A40](plots/ablation_Dataset306_3d_fullres_a40.png)
 
-![Ablation - BONES 3D fullres - L40S](plots/ablation_Dataset306_3d_fullres_L40S.png)
+![Ablation - BONES 3D fullres - L40S](plots/ablation_Dataset306_3d_fullres_l40s.png)
 
 ![Ablation - BONES 3D fullres - DGX Spark](plots/ablation_Dataset306_3d_fullres_dgx.png)
 
