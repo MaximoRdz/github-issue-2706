@@ -56,7 +56,9 @@ Sadly, autocast TensorRT is not always the fastest option, in several configurat
 TensorRT is an actively developed project, and some operations aren't yet perfectly optimized by the compiler. I'm talking specifically about skip connections. At least from what I've been able to find, TensorRT doesn't have a specific way of optimizing skip connections as a whole. Meaning: in a UNet model, TensorRT optimizes `encoder -> bottleneck -> decoder` in order and independently, so the optimal policy for the encoder might not align with the decoder's (and in my experiments, it did not). For increasingly larger inputs, performance ends up heavily dominated by memory bandwidth during the skip connections' `torch.cat` operations, plus unnecessary reformatting and moves of the skipped features to match the decoder's upcoming features (NHWC-type format, etc.). These operations clearly don't scale well, and cause models with large input sizes compiled with TensorRT to perform worse than plain PyTorch (unless the GPU architecture bandwidth is good enough to tolerate this as in the case of DGX GB100, it would be interesting to test in A100, etc).
 
 One workaround, until the TensorRT compiler gets smarter about this, would be to replace the costly concatenation of the two tensors followed by a convolution, with the sum of two properly configured partial convolutions (mathematically equivalent, no retraining needed):
+
 $$conv(cat(features, skips)) = conv1(features) + conv2(skips)$$
+
 But then again, this introduces the overhead of more kernel launches, and while it performs better than plain eager PyTorch, this custom TensorRT solution is often still slower than the simpler `torch.compile(network)` for these large input tensors.
 
 ## Experiments
