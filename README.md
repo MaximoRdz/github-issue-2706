@@ -49,7 +49,7 @@ network = torch.export.load(output_filepath).module()
 
 Sadly, autocast TensorRT is not always the fastest option, in several configurations it's actually beaten by plain `torch.compile` (see below):
 
-![pytorch vs torch.compile vs trt-solution-autocast](plots/trt_not_magic.png)
+![pytorch vs torch.compile vs trt-solution-autocast](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/trt_not_magic.png)
 
 ## Caveats
 
@@ -94,22 +94,22 @@ As this topic aligns with my thesis, I performed some experiments to check. In p
 
 TensorRT compiled engine performs really well for 2d as the task is compute-bound and not really bandwidth bound the fused kernels and other optimizations dominate over `torch.compile` (patch size of ~ 5.1 KB for fp16)
 
-![Ablation - ACDC 2D - A40](plots/ablation_Dataset027_2d_a40.png)
+![Ablation - ACDC 2D - A40](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset027_2d_a40.png)
 
-![Ablation - ACDC 2D - L40S](plots/ablation_Dataset027_2d_l40s.png)
+![Ablation - ACDC 2D - L40S](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset027_2d_l40s.png)
 
-![Ablation - ACDC 2D - DGX Spark](plots/ablation_Dataset027_2d_dgx.png)
+![Ablation - ACDC 2D - DGX Spark](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset027_2d_dgx.png)
 
 
 **BONES (Dataset306)**
 
 Again we see some improvements by using tensorRT but the larger input size already appears (patch size ~ 0.5 MB) particularly bad for L40S
 
-![Ablation - BONES 2D - A40](plots/ablation_Dataset306_2d_a40.png)
+![Ablation - BONES 2D - A40](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset306_2d_a40.png)
 
-![Ablation - BONES 2D - L40S](plots/ablation_Dataset306_2d_l40s.png)
+![Ablation - BONES 2D - L40S](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset306_2d_l40s.png)
 
-![Ablation - BONES 2D - DGX Spark](plots/ablation_Dataset306_2d_dgx.png)
+![Ablation - BONES 2D - DGX Spark](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset306_2d_dgx.png)
 
 
 ### 2. 3D_fullres configuration
@@ -118,33 +118,33 @@ Again we see some improvements by using tensorRT but the larger input size alrea
 
 `torch.compile` is better for GPUs with worst bandwidth where the bad compilation of skip connections effect dominates. 
 
-![Ablation - ACDC 3D fullres - A40](plots/ablation_Dataset027_3d_fullres_a40.png)
+![Ablation - ACDC 3D fullres - A40](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset027_3d_fullres_a40.png)
 
-![Ablation - ACDC 3D fullres - L40S](plots/ablation_Dataset027_3d_fullres_l40s.png)
+![Ablation - ACDC 3D fullres - L40S](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset027_3d_fullres_l40s.png)
 
-![Ablation - ACDC 3D fullres - DGX Spark](plots/ablation_Dataset027_3d_fullres_dgx.png)
+![Ablation - ACDC 3D fullres - DGX Spark](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset027_3d_fullres_dgx.png)
 
 
 **BONES (Dataset306)**
 
-![Ablation - BONES 3D fullres - A40](plots/ablation_Dataset306_3d_fullres_a40.png)
+![Ablation - BONES 3D fullres - A40](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset306_3d_fullres_a40.png)
 
-![Ablation - BONES 3D fullres - L40S](plots/ablation_Dataset306_3d_fullres_l40s.png)
+![Ablation - BONES 3D fullres - L40S](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset306_3d_fullres_l40s.png)
 
-![Ablation - BONES 3D fullres - DGX Spark](plots/ablation_Dataset306_3d_fullres_dgx.png)
+![Ablation - BONES 3D fullres - DGX Spark](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/ablation_Dataset306_3d_fullres_dgx.png)
 
 ### 3. TensorRT explosion on 3D_fullres skip connections
 
 Skip-connection concatenation becomes a bottleneck on larger inputs. Below is the profiling evidence on the A40.
 
 **Dataset027 dataset, 3D fullres**
-![ACDC dataset 3D fullres TensorRT profiling on A40](plots/acdc_profile.png)
+![ACDC dataset 3D fullres TensorRT profiling on A40](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/acdc_profile.png)
 
 **Dataset306 Bone tumor dataset, 3D fullres**
-![Bone tumor dataset 3D fullres TensorRT profiling on A40](plots/bones_profile.png)
+![Bone tumor dataset 3D fullres TensorRT profiling on A40](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/bones_profile.png)
 
 **Naive solution** Bone tumor dataset, 3D fullres, replacing concatenation with two convolutions:
-![Bone tumor dataset 3D fullres, no-cat workaround, profiling on A40](plots/bones_profile_no_cat.png)
+![Bone tumor dataset 3D fullres, no-cat workaround, profiling on A40](https://github.com/MaximoRdz/github-issue-2706/blob/main/plots/bones_profile_no_cat.png)
 
 ## Misc Comments
 
