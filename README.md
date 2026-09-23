@@ -78,17 +78,27 @@ As this topic aligns with my thesis, I performed some experiments to check. In p
 | nnUNet         | 0e49508     | 0e49508    | 0e49508     |
 
 ### Datasets
-# Dataset and Model Configuration Specifications
-
-- Automated Cardiac Diagnosis Challenge (ACDC) — [kaggle](https://www.kaggle.com/datasets/anhoangvo/acdc-dataset/data)
+- Automated Cardiac Diagnosis Challenge (ACDC Dataset027) — [kaggle](https://www.kaggle.com/datasets/anhoangvo/acdc-dataset/data)
         - Tested with configurations 2d and 3d_fullres, planner: `nnUNetPlannerResEncL`
     - 2D configuration patch size: `(256, 10)`
     - 3D_fullres configuration patch size: `(256, 256, 10)`
     
-- Bone tumor segmentation (private dataset), labels: 0 = background, 1 = tumor, CT scans of `(N, 512, 512)`. Used an old model trained on `nnUNetPlans`, no residual encoder.
+- Bone tumor segmentation (private dataset Dataset306), labels: 0 = background, 1 = tumor, CT scans of `(N, 512, 512)`. Used an old model trained on `nnUNetPlans`, no residual encoder.
     - 2D configuration patch size: `(512, 512)`
     - 3D_fullres configuration patch size: `(48, 192, 192)`
 ## Results
+Several configuratons tested:
+* `github-issue`: Implementation/configuration from the GitHub issue.
+* `pytorch`: Standard PyTorch nnUNet inference implementation (baseline, normalized to 1.00×).
+* `pytorch-compile`: PyTorch model compiled with torch.compile (no NHWC or split-conv modifications).
+* `pytorch-compile-nhwc-split-conv`: torch.compile using NHWC layout and split-convolution transformation on skip connections.
+* `pytorch-nhwc`: Standard PyTorch inference using NHWC memory layout (no torch.compile or split-conv).
+* `pytorch-nhwc-split-conv`: PyTorch with NHWC layout and split-convolution, without torch.compile.
+* `trt-solution-fp32`: Proposed TensorRT solution running in full FP32 precision.
+* `trt-solution-autocast`: TensorRT solution using autocast for automatic lower-precision selection.
+* `trt-solution-fp16`: TensorRT solution explicitly configured for FP16 precision.
+* `trt-solution-fp16-nhwc`: TensorRT FP16 configuration combined with NHWC memory layout.
+* `trt-solution-fp16-nhwc-split-conv`: TensorRT FP16 + NHWC layout with split-convolution to optimize skip-connection concats.
 
 ### 1. 2D configuration
 
